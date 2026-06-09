@@ -27,7 +27,7 @@ const VALID_DB_COLUMN_MAP: Record<string, string[]> = {
     'id', 'title', 'content', 'category', 'date', 'author', 'attachment_url', 'created_at', 'updated_at', 'created_by', 'active'
   ],
   incidents: [
-    'id', 'title', 'category', 'description', 'unit', 'status', 'date', 'replies', 'created_at', 'updated_at', 'created_by', 'active', 'deleted_at', 'deleted_by', 'deletion_reason'
+    'id', 'title', 'category', 'description', 'unit', 'status', 'date', 'replies', 'photo_urls', 'created_at', 'updated_at', 'created_by', 'active', 'deleted_at', 'deleted_by', 'deletion_reason'
   ],
   encomendas: [
     'id', 'codigo_rastreio', 'morador_id', 'morador_nome', 'apartamento', 'torre', 'data_recebimento', 'responsavel_recebimento', 'observacoes', 'foto_url', 'qr_code_value', 'status', 'data_retirada', 'quem_retirou', 'responsavel_entrega', 'created_at', 'updated_at', 'created_by', 'active'

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { toSnakeCase, toCamelCase } from './lib/utils';
+import { toSnakeCase, toCamelCase, parseUsageCount, updateUsageCount } from './lib/utils';
 import { supabase } from './lib/supabase';
 import { getConfig } from './lib/config';
 import { useDexiePersistence, getTableForStore } from './lib/db';
@@ -867,6 +867,23 @@ export default function App() {
     'Manutenção',
     'Outro'
   ]);
+
+  const [visitorTypes, setVisitorTypes] = useDexiePersistence<string[]>('visitorTypes', [
+    'Regular',
+    'Prestador',
+    'Entrega',
+    'Parente'
+  ]);
+
+  const [visitorValidities, setVisitorValidities] = useDexiePersistence<{label: string, hours: number}[]>('visitorValidities', [
+    { label: '3 Horas', hours: 3 },
+    { label: '6 Horas', hours: 6 },
+    { label: '12 Horas', hours: 12 },
+    { label: '24 Horas (1 Dia)', hours: 24 },
+    { label: '3 Dias', hours: 72 },
+    { label: '5 Dias', hours: 120 },
+    { label: '7 Dias', hours: 168 }
+  ]);
   const [auditLogs, setAuditLogs] = useDexiePersistence<AuditLog[]>('auditLogs', []);
   const [retentionDays, setRetentionDays] = useLocalStoragePersistence<number>('retentionDays', 30);
 
@@ -1102,10 +1119,12 @@ export default function App() {
     });
 
     if (matchedVisitor) {
-       if (matchedVisitor.status === 'Dentro') {
+       const currentUsage = parseUsageCount(matchedVisitor.notes);
+
+       if (currentUsage >= 2) {
           return {
             success: false,
-            message: `O visitante ${matchedVisitor.name} já tem status ativo como 'Dentro' do condomínio.`,
+            message: `ACESSO NEGADO: O QR Code de ${matchedVisitor.name} já foi totalmente utilizado (entrada e saída registradas).`,
             type: 'visitor'
           };
        }
@@ -1113,7 +1132,7 @@ export default function App() {
        if (matchedVisitor.expirationTime && new Date() > new Date(matchedVisitor.expirationTime)) {
           return {
             success: false,
-            message: `ACESSO NEGADO: O passe de acesso rápido de ${matchedVisitor.name} EXPIROU em ${new Date(matchedVisitor.expirationTime).toLocaleString('pt-BR')}.`,
+            message: `ACESSO NEGADO: O passe de acesso de ${matchedVisitor.name} EXPIROU.`,
             type: 'visitor'
           };
        }
@@ -1122,27 +1141,32 @@ export default function App() {
          // Stage 1 pre-confirmation
          return {
            success: true,
-           message: 'Visitante identificado.',
+           message: `Visitante ${matchedVisitor.name} identificado. Confirmar ${currentUsage === 0 ? 'Entrada' : 'Saída'}?`,
            type: 'visitor',
            data: matchedVisitor
          };
        }
 
-       // Update status to "Dentro" (Stage 2)
+       // Update status (Stage 2)
+       const newUsage = currentUsage + 1;
+       const newStatus = newUsage === 1 ? 'Dentro' : 'Saiu';
+       
        const updatedList = visitors.map(v => v.id === matchedVisitor.id ? {
          ...v,
-         status: 'Dentro' as const,
-         entryTime: new Date().toISOString()
+         status: newStatus as 'Dentro' | 'Saiu',
+         entryTime: newUsage === 1 ? new Date().toISOString() : v.entryTime,
+         exitTime: newUsage === 2 ? new Date().toISOString() : v.exitTime,
+         notes: updateUsageCount(v.notes, newUsage)
        } : v);
 
        await saveVisitors(updatedList);
        
        // Trigger gate/cancela barrier release
-       triggerCancelaRelease(`Portaria Express: Visitante ${matchedVisitor.name}`, matchedVisitor.vehiclePlate, 'visitor');
-       setToast({ message: `Acesso Express Liberado para: ${matchedVisitor.name}!`, type: 'success' });
+       triggerCancelaRelease(`Portaria Express: ${newStatus === 'Dentro' ? 'Entrada' : 'Saída'} - ${matchedVisitor.name}`, matchedVisitor.vehiclePlate, 'visitor');
+       setToast({ message: `Acesso Express (${newStatus === 'Dentro' ? 'Entrada' : 'Saída'}) liberado para: ${matchedVisitor.name}!`, type: 'success' });
        return {
          success: true,
-         message: `Convite de Visitante Válido! Acesso Autorizado para: ${matchedVisitor.name} (Destino: Unidade ${matchedVisitor.unitToVisit} - Anfitrião: ${matchedVisitor.hostName}).`,
+         message: `Visitante ${matchedVisitor.name} (${newStatus === 'Dentro' ? 'Entrada' : 'Saída'} registrada com sucesso).`,
          type: 'visitor',
          data: matchedVisitor
        };
@@ -1151,8 +1175,17 @@ export default function App() {
     // 3. Check if scanned QR matches a Resident
     const matchedResident = residents.find(res => {
       const scanVal = textClean.trim().toUpperCase();
-      return (res.qrCodeValue && res.qrCodeValue.trim().toUpperCase() === scanVal) || 
-             (res.id.toLowerCase() === textClean.trim().toLowerCase());
+      const resQrCode = res.qrCodeValue ? res.qrCodeValue.trim().toUpperCase() : '';
+      
+      // Match full value or last part (for old UUIDs) if scanVal is short
+      const match = (resQrCode === scanVal) || 
+                    (scanVal.length <= 8 && resQrCode.endsWith(scanVal)) ||
+                    (res.id.toLowerCase() === textClean.trim().toLowerCase());
+                    
+      if (match) {
+        console.log(`[DEBUG] Matched resident: ${res.name} (scan: ${scanVal}, qr: ${resQrCode})`);
+      }
+      return match;
     });
 
     if (matchedResident) {
@@ -1167,7 +1200,7 @@ export default function App() {
       }
 
       // Access logic
-      triggerCancelaRelease(`ACESSO LIBERADO: ${matchedResident.name} (${matchedResident.unit})`, undefined, 'visitor');
+      triggerCancelaRelease(`ACESSO LIBERADO: ${matchedResident.name} (${matchedResident.unit})`);
       setToast({ message: `ACESSO LIBERADO: ${matchedResident.name}!`, type: 'success' });
       return {
         success: true,
@@ -1177,10 +1210,10 @@ export default function App() {
       };
     }
 
-    // 4. Unrecognized QRCode code
+    // 4. Fallback for unknown
     return {
       success: false,
-      message: `Código escaneado não cadastrado no sistema de Segurança Integrada: "${textClean}". Certifique-se de escanear um QRCode válido.`,
+      message: 'Código não reconhecido como visitante, morador ou encomenda.',
       type: 'unknown'
     };
   };
@@ -1809,6 +1842,30 @@ export default function App() {
                         console.error("[SYNC_DIAGNOSTIC] Erro ao processar incident_categories:", pe);
                     }
                 }
+
+                const visitorTypesConfig = configs.find((c: any) => c.key === 'visitor_types');
+                if (visitorTypesConfig && visitorTypesConfig.value) {
+                    try {
+                        let parsed = typeof visitorTypesConfig.value === 'string' ? JSON.parse(visitorTypesConfig.value) : visitorTypesConfig.value;
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            setVisitorTypes(prev => JSON.stringify(prev) !== JSON.stringify(parsed) ? parsed : prev);
+                        }
+                    } catch (pe) {
+                        console.error("[SYNC] Error parsing visitor types from app_config:", pe);
+                    }
+                }
+
+                const visitorValiditiesConfig = configs.find((c: any) => c.key === 'visitor_validities');
+                if (visitorValiditiesConfig && visitorValiditiesConfig.value) {
+                    try {
+                        let parsed = typeof visitorValiditiesConfig.value === 'string' ? JSON.parse(visitorValiditiesConfig.value) : visitorValiditiesConfig.value;
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            setVisitorValidities(prev => JSON.stringify(prev) !== JSON.stringify(parsed) ? parsed : prev);
+                        }
+                    } catch (pe) {
+                        console.error("[SYNC] Error parsing visitor validities from app_config:", pe);
+                    }
+                }
             }
         } catch (e: any) {
             console.error("[SYNC_DIAGNOSTIC] Falha crítica de sincronização geral:", e);
@@ -2121,23 +2178,17 @@ export default function App() {
     setToast({ message: 'Encomenda entregue com sucesso!', type: 'success' });
   };
 
-  const handleRemoveEncomenda = async (id: string, reason?: string) => {
+  const handleRemoveEncomenda = async (id: string) => {
     const original = encomendas.find(e => e?.id === id);
     if (!original) return;
-    const askReason = reason || window.prompt('Motivo do arquivamento desta encomenda:', 'Correção de digitação / Extravio') || 'Correção';
 
-    const updatedItem = {
-      ...original,
-      deleted_at: new Date().toISOString(),
-      deleted_by: currentUser?.name || 'Administrador',
-      deletion_reason: askReason
-    };
+    if (!confirm('Deseja realmente excluir permanentemente o registro desta encomenda do sistema?')) return;
 
-    const updated = encomendas.map(e => e?.id === id ? updatedItem : e);
-    setEncomendas(updated);
-    addToSyncQueue('encomendas', 'upsert', toSnakeCase(updatedItem));
-    addAuditLog('DELETE', 'Encomendas', id, original, updatedItem);
-    setToast({ message: 'Encomenda arquivada logicamente com sucesso.', type: 'success' });
+    const filtered = encomendas.filter(e => e?.id !== id);
+    setEncomendas(filtered);
+    addToSyncQueue('encomendas', 'delete', id);
+    addAuditLog('DELETE', 'Encomendas', id, original, { id });
+    setToast({ message: 'Encomenda excluída definitivamente do sistema.', type: 'success' });
   };
 
   const handleAddAchadosPerdidos = (item: AchadosPerdidos, files: string[], hist: AchadosPerdidosHistorico) => {
@@ -2959,6 +3010,24 @@ export default function App() {
     setToast({ message: 'Lista de categorias de ocorrências salva com sucesso!', type: 'success' });
   };
 
+  const handleSaveVisitorTypes = (types: string[]) => {
+    setVisitorTypes(types);
+    addToSyncQueue('app_config', 'upsert', {
+      key: 'visitor_types',
+      value: JSON.stringify(types)
+    });
+    setToast({ message: 'Tipos de acesso salvos com sucesso!', type: 'success' });
+  };
+
+  const handleSaveVisitorValidities = (validities: {label: string, hours: number}[]) => {
+    setVisitorValidities(validities);
+    addToSyncQueue('app_config', 'upsert', {
+      key: 'visitor_validities',
+      value: JSON.stringify(validities)
+    });
+    setToast({ message: 'Lista de validades salva com sucesso!', type: 'success' });
+  };
+
   useEffect(() => {
     let styleEl = document.getElementById('dynamic-theme-vars');
     if (!styleEl) {
@@ -3402,6 +3471,10 @@ export default function App() {
               onUpdateVisitorStatus={handleUpdateVisitorStatus}
               onRemoveVisitor={handleRemoveVisitor}
               currentUser={currentUser}
+              visitorTypes={visitorTypes}
+              onSaveVisitorTypes={handleSaveVisitorTypes}
+              visitorValidities={visitorValidities}
+              onSaveVisitorValidities={handleSaveVisitorValidities}
             />
           )}
 

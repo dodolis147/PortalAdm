@@ -77,12 +77,12 @@ export default function ResidentDetailsModal({ resident, onClose }: ResidentDeta
            <div className="mt-2 p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-center w-full">
              <p className="text-[10px] text-gray-500 mb-0.5">Código de Acesso</p>
              <div className="flex justify-center items-center gap-2">
-               <p className="text-xl font-bold font-mono tracking-widest" style={{ color: '#1e293b' }}>
-                 {resident.qrCodeValue?.slice(-4).toUpperCase()}
+               <p className="text-sm font-bold font-mono tracking-widest" style={{ color: '#1e293b' }}>
+                 {resident.qrCodeValue || 'N/A'}
                </p>
                <button 
                  onClick={() => {
-                   navigator.clipboard.writeText(resident.qrCodeValue?.slice(-4).toUpperCase() || '');
+                   navigator.clipboard.writeText(resident.qrCodeValue || '');
                  }}
                  className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-slate-800"
                  title="Copiar código de acesso"

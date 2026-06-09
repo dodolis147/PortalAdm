@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS public.incidents (
   status text DEFAULT 'Aberto',
   date text DEFAULT now()::text,
   replies jsonb DEFAULT '[]'::jsonb,
+  photo_urls jsonb DEFAULT '[]'::jsonb,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
   created_by uuid,

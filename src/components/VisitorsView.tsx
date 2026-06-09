@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, UserPlus, Search, CheckCircle, LogOut, Clock, Calendar, QrCode, ClipboardList, ShieldAlert, Trash2
+  Users, UserPlus, Search, CheckCircle, LogOut, Clock, Calendar, QrCode, ClipboardList, ShieldAlert, Trash2, X, Plus, Check, Edit2
 } from 'lucide-react';
 import { Visitor, Resident } from '../types';
 import { toUpperText, generateAccessCode } from '../lib/utils';
@@ -29,6 +29,10 @@ interface VisitorsViewProps {
   onUpdateVisitorStatus: (id: string, status: 'Pre-Autorizado' | 'Dentro' | 'Saiu' | 'Recusado') => void;
   onRemoveVisitor: (id: string) => void;
   currentUser: { id: string; name: string; unit?: string; role: 'Administrador' | 'Morador' | 'Porteiro' | 'MASTER' };
+  visitorTypes?: string[];
+  onSaveVisitorTypes?: (types: string[]) => void;
+  visitorValidities?: {label: string, hours: number}[];
+  onSaveVisitorValidities?: (validities: {label: string, hours: number}[]) => void;
 }
 
 export default function VisitorsView({
@@ -38,7 +42,11 @@ export default function VisitorsView({
   onCheckOutVisitor,
   onUpdateVisitorStatus,
   onRemoveVisitor,
-  currentUser
+  currentUser,
+  visitorTypes,
+  onSaveVisitorTypes,
+  visitorValidities,
+  onSaveVisitorValidities
 }: VisitorsViewProps) {
   const [activeTab, setActiveTab] = useState<'inside' | 'preauth' | 'history'>('inside');
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,7 +56,7 @@ export default function VisitorsView({
   const [name, setName] = useState('');
   const [document, setDocument] = useState('');
   const [phone, setPhone] = useState('');
-  const [type, setType] = useState<'Regular' | 'Prestador' | 'Entrega' | 'Parente'>('Regular');
+  const [type, setType] = useState<string>('Regular');
   const [unitToVisit, setUnitToVisit] = useState('');
   const [company, setCompany] = useState('');
   const [vehiclePlate, setVehiclePlate] = useState('');
@@ -59,8 +67,97 @@ export default function VisitorsView({
   // Active QR Code Modal state
   const [activeQrCodeVisitor, setActiveQrCodeVisitor] = useState<Visitor | null>(null);
 
+  // Config Modal State
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configTab, setConfigTab] = useState<'types' | 'validities'>('types');
+  const [newTypeText, setNewTypeText] = useState('');
+  const [editingType, setEditingType] = useState<string | null>(null);
+  const [newValidityLabel, setNewValidityLabel] = useState('');
+  const [newValidityHours, setNewValidityHours] = useState('');
+
+  const activeTypes = visitorTypes || ['Regular', 'Prestador', 'Entrega', 'Parente'];
+  const activeValidities = visitorValidities || [
+    { label: '3 Horas', hours: 3 },
+    { label: '6 Horas', hours: 6 },
+    { label: '12 Horas', hours: 12 },
+    { label: '24 Horas (1 Dia)', hours: 24 },
+    { label: '3 Dias', hours: 72 },
+    { label: '5 Dias', hours: 120 },
+    { label: '7 Dias', hours: 168 }
+  ];
+
   // Countdown timer for expired visitors
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const handleAddType = () => {
+    if (!newTypeText.trim()) return;
+    const cleanName = toUpperText({ text: newTypeText.trim() }).text;
+    if (activeTypes.includes(cleanName)) {
+      alert('Este tipo de acesso já existe.');
+      return;
+    }
+    const updated = [...activeTypes, cleanName];
+    if (onSaveVisitorTypes) onSaveVisitorTypes(updated);
+    setNewTypeText('');
+  };
+
+  const handleRemoveType = (catName: string) => {
+    if (activeTypes.length <= 1) {
+      alert('É necessário ter pelo menos um tipo de acesso.');
+      return;
+    }
+    if (confirm(`Tem certeza que deseja remover o tipo de acesso "${catName}"?`)) {
+      const updated = activeTypes.filter(c => c !== catName);
+      if (onSaveVisitorTypes) onSaveVisitorTypes(updated);
+    }
+  };
+
+  const handleStartEditType = (catName: string) => {
+    setEditingType(catName);
+    setNewTypeText(catName);
+  };
+
+  const handleSaveEditType = (oldCatName: string) => {
+    if (!newTypeText.trim()) return;
+    const cleanName = toUpperText({ text: newTypeText.trim() }).text;
+    if (cleanName !== oldCatName && activeTypes.includes(cleanName)) {
+      alert('Já existe um tipo de acesso com este nome.');
+      return;
+    }
+    const updated = activeTypes.map(c => c === oldCatName ? cleanName : c);
+    if (onSaveVisitorTypes) onSaveVisitorTypes(updated);
+    setEditingType(null);
+    setNewTypeText('');
+  };
+
+  const handleAddValidity = () => {
+    if (!newValidityLabel.trim() || !newValidityHours.trim()) return;
+    const hours = parseInt(newValidityHours, 10);
+    if (isNaN(hours) || hours <= 0) {
+      alert('Formato de horas inválido.');
+      return;
+    }
+    const cleanLabel = toUpperText({ text: newValidityLabel.trim() }).text;
+    if (activeValidities.find(v => v.label === cleanLabel)) {
+      alert('Já existe uma validade com este nome.');
+      return;
+    }
+    const updated = [...activeValidities, { label: cleanLabel, hours }];
+    if (onSaveVisitorValidities) onSaveVisitorValidities(updated);
+    setNewValidityLabel('');
+    setNewValidityHours('');
+  };
+
+  const handleRemoveValidity = (label: string) => {
+    if (activeValidities.length <= 1) {
+      alert('É necessário ter pelo menos uma validade configurada.');
+      return;
+    }
+    if (confirm(`Tem certeza que deseja remover a validade "${label}"?`)) {
+      const updated = activeValidities.filter(v => v.label !== label);
+      if (onSaveVisitorValidities) onSaveVisitorValidities(updated);
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -120,13 +217,18 @@ export default function VisitorsView({
     const hostName = matchedResident ? matchedResident.name : 'Administração / Portaria';
 
     let durationMs = 24 * 60 * 60 * 1000;
-    if (validityDuration === '3h') durationMs = 3 * 60 * 60 * 1000;
-    else if (validityDuration === '6h') durationMs = 6 * 60 * 60 * 1000;
-    else if (validityDuration === '12h') durationMs = 12 * 60 * 60 * 1000;
-    else if (validityDuration === '24h') durationMs = 24 * 60 * 60 * 1000;
-    else if (validityDuration === '3d') durationMs = 3 * 24 * 60 * 60 * 1000;
-    else if (validityDuration === '5d') durationMs = 5 * 24 * 60 * 60 * 1000;
-    else if (validityDuration === '7d') durationMs = 7 * 24 * 60 * 60 * 1000;
+    const selectedValidity = visitorValidities?.find(v => v.label === validityDuration || v.label === getDurationLabel(validityDuration));
+    if (selectedValidity) {
+      durationMs = selectedValidity.hours * 60 * 60 * 1000;
+    } else {
+      if (validityDuration === '3h') durationMs = 3 * 60 * 60 * 1000;
+      else if (validityDuration === '6h') durationMs = 6 * 60 * 60 * 1000;
+      else if (validityDuration === '12h') durationMs = 12 * 60 * 60 * 1000;
+      else if (validityDuration === '24h') durationMs = 24 * 60 * 60 * 1000;
+      else if (validityDuration === '3d') durationMs = 3 * 24 * 60 * 60 * 1000;
+      else if (validityDuration === '5d') durationMs = 5 * 24 * 60 * 60 * 1000;
+      else if (validityDuration === '7d') durationMs = 7 * 24 * 60 * 60 * 1000;
+    }
 
     const expirationTime = new Date(Date.now() + durationMs).toISOString();
 
@@ -258,16 +360,29 @@ export default function VisitorsView({
               
               {/* Type selector */}
               <div>
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Tipo de Acesso</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block">Tipo de Acesso</label>
+                  {(currentUser.role === 'Administrador' || currentUser.role === 'MASTER') && (
+                    <button type="button" onClick={() => setShowConfigModal(true)} className="text-[9px] text-sky-600 font-bold uppercase tracking-widest hover:underline cursor-pointer">
+                      Configurar
+                    </button>
+                  )}
+                </div>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as any)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
                 >
-                  <option value="Regular">Visita Comum</option>
-                  <option value="Prestador">Prestador de Serviço</option>
-                  <option value="Entrega">Entrega / Delivery</option>
-                  <option value="Parente">Parente</option>
+                  {visitorTypes?.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  )) || (
+                    <>
+                      <option value="Regular">Visita Comum</option>
+                      <option value="Prestador">Prestador de Serviço</option>
+                      <option value="Entrega">Entrega / Delivery</option>
+                      <option value="Parente">Parente</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -326,7 +441,14 @@ export default function VisitorsView({
 
               {/* Validity selector */}
               <div>
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Tempo de Liberação / Validade *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block">Tempo de Liberação / Validade *</label>
+                  {(currentUser.role === 'Administrador' || currentUser.role === 'MASTER') && (
+                    <button type="button" onClick={() => setShowConfigModal(true)} className="text-[9px] text-sky-600 font-bold uppercase tracking-widest hover:underline cursor-pointer">
+                      Configurar
+                    </button>
+                  )}
+                </div>
                 <select
                   value={validityDuration}
                   onChange={(e) => setValidityDuration(e.target.value)}
@@ -334,13 +456,19 @@ export default function VisitorsView({
                   required
                 >
                   <option value="">Selecione a validade...</option>
-                  <option value="3h">3 Horas</option>
-                  <option value="6h">6 Horas</option>
-                  <option value="12h">12 Horas</option>
-                  <option value="24h">24 Horas (1 Dia)</option>
-                  <option value="3d">3 Dias</option>
-                  <option value="5d">5 Dias</option>
-                  <option value="7d">7 Dias</option>
+                  {visitorValidities?.map(v => (
+                    <option key={v.label} value={v.label}>{v.label} ({v.hours}h)</option>
+                  )) || (
+                    <>
+                      <option value="3h">3 Horas</option>
+                      <option value="6h">6 Horas</option>
+                      <option value="12h">12 Horas</option>
+                      <option value="24h">24 Horas (1 Dia)</option>
+                      <option value="3d">3 Dias</option>
+                      <option value="5d">5 Dias</option>
+                      <option value="7d">7 Dias</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -821,6 +949,142 @@ https://sistema.com/convite/express-${activeQrCodeVisitor.id}`;
             </div>
 
             
+          </div>
+        </div>
+      )}
+      
+      {/* Configuration Modal */}
+      {showConfigModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg min-h-[400px] flex flex-col shadow-2xl relative overflow-hidden">
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/50">
+              <h3 className="text-md font-bold text-slate-800 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-sky-600" /> Configurações de Acesso
+              </h3>
+              <button 
+                onClick={() => setShowConfigModal(false)}
+                className="text-gray-400 hover:text-rose-600 p-1 rounded-full hover:bg-rose-50 transition-colors"
+                title="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex bg-slate-50 border-b border-gray-100">
+              <button 
+                onClick={() => setConfigTab('types')} 
+                className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${configTab === 'types' ? 'text-sky-700 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Tipos de Acesso
+              </button>
+              <button 
+                onClick={() => setConfigTab('validities')} 
+                className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${configTab === 'validities' ? 'text-sky-700 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Validades / Prazos
+              </button>
+            </div>
+
+            <div className="p-5 flex-1 overflow-y-auto">
+              {configTab === 'types' && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <input
+                      type="text"
+                      placeholder="Novo tipo de acesso (ex: Cuidador)"
+                      value={editingType === null ? newTypeText : ''}
+                      onChange={(e) => editingType === null && setNewTypeText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddType(); }}
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+                    />
+                    <button
+                      onClick={handleAddType}
+                      className="bg-sky-600 hover:bg-sky-700 text-white p-2 rounded-xl"
+                      title="Adicionar Tipo"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <ul className="space-y-2">
+                    {activeTypes.map((cat) => (
+                      <li key={cat} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                        {editingType === cat ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <input
+                              type="text"
+                              value={newTypeText}
+                              onChange={(e) => setNewTypeText(e.target.value)}
+                              className="flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1 text-sm outline-none"
+                              autoFocus
+                            />
+                            <button onClick={() => handleSaveEditType(cat)} className="text-emerald-600 p-1 hover:bg-emerald-50 rounded"><Check className="w-4 h-4" /></button>
+                            <button onClick={() => setEditingType(null)} className="text-slate-400 p-1 hover:bg-slate-200 rounded"><X className="w-4 h-4" /></button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-sm font-semibold text-slate-700">{cat}</span>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => handleStartEditType(cat)} className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => handleRemoveType(cat)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {configTab === 'validities' && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <input
+                      type="text"
+                      placeholder="Nome (ex: 2 Meses)"
+                      value={newValidityLabel}
+                      onChange={(e) => setNewValidityLabel(e.target.value)}
+                      className="flex-[2] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Horas (Ex: 1440)"
+                      value={newValidityHours}
+                      onChange={(e) => setNewValidityHours(e.target.value)}
+                      className="flex-1 min-w-[100px] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+                    />
+                    <button
+                      onClick={handleAddValidity}
+                      className="bg-sky-600 hover:bg-sky-700 text-white p-2 rounded-xl"
+                      title="Adicionar Validade"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <ul className="space-y-2">
+                    {activeValidities.map((v) => (
+                      <li key={v.label} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                        <div>
+                          <span className="text-sm font-semibold text-slate-700 block">{v.label}</span>
+                          <span className="text-[10px] text-slate-400 font-mono tracking-wider">{v.hours} horas</span>
+                        </div>
+                        <button onClick={() => handleRemoveValidity(v.label)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button 
+                onClick={() => setShowConfigModal(false)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold"
+              >
+                Concluir e Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

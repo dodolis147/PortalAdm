@@ -31,7 +31,7 @@ export interface Visitor {
   name: string;
   document: string; // RG/CPF
   phone: string;
-  type: 'Regular' | 'Prestador' | 'Entrega' | 'Parente';
+  type: string | 'Regular' | 'Prestador' | 'Entrega' | 'Parente';
   unitToVisit: string;
   residentId?: string; // Links to Resident ID
   hostName: string;

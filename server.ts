@@ -470,7 +470,7 @@ app.post('/api/save-visitor', async (req, res) => {
   }
 });
 
-function generateAccessCode(length: number = 8): string {
+function generateAccessCode(length: number = 4): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < length; i++) {

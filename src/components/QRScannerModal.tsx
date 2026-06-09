@@ -17,8 +17,6 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
   const [scanError, setScanError] = useState<string>('');
   const [manualCode, setManualCode] = useState<string>('');
   const [manualModeActive, setManualModeActive] = useState<boolean>(false);
-  const [receiverName, setReceiverName] = useState<string>('');
-  
   const [pendingItem, setPendingItem] = useState<{ type: 'visitor' | 'package' | 'resident'; data: any; decodedText: string } | null>(null);
   const [confirmingLoading, setConfirmingLoading] = useState(false);
   
@@ -75,18 +73,13 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
 
   const handleConfirmAccess = async () => {
     if (!pendingItem) return;
-    if (pendingItem.type === 'package' && !receiverName.trim()) {
-      alert('Por favor, informe o nome do recebedor da encomenda.');
-      return;
-    }
     setConfirmingLoading(true);
     setScanError('');
     try {
-      const extraData = pendingItem.type === 'package' ? { receiverName: receiverName.trim() } : {};
+      const extraData = {};
       const result = await onScanSuccess(pendingItem.decodedText, true, extraData);
       setScanResult({ success: result.success, message: result.message });
       setPendingItem(null);
-      setReceiverName('');
     } catch (err: any) {
       setScanError(err.message || 'Erro ao processar liberação final.');
     } finally {
@@ -405,16 +398,6 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 border-t border-zinc-800/60 pt-3 text-xs leading-normal">
-                      <div className="col-span-2">
-                        <label className="text-[8px] uppercase font-bold text-zinc-550 block font-mono mb-1">Nome do Recebedor (Obrigatório)</label>
-                        <input
-                          type="text"
-                          value={receiverName}
-                          onChange={(e) => setReceiverName(e.target.value)}
-                          placeholder="Digite o nome de quem recebeu..."
-                          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-200 text-xs focus:border-emerald-500 focus:outline-none"
-                        />
-                      </div>
                       <div>
                         <span className="text-[8px] uppercase font-bold text-zinc-550 block font-mono">Apartamento / Torre</span>
                         <span className="text-zinc-200 font-extrabold">{pendingItem.data.torre} - Apt {pendingItem.data.apartamento}</span>

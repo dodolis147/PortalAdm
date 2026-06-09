@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   AlertTriangle, MessageSquare, Plus, CheckCircle, Sparkles, Send, Loader2, RefreshCw, Trash2, X, Edit2, Check
 } from 'lucide-react';
@@ -6,6 +6,7 @@ import { Incident, Resident, IncidentReply } from '../types';
 import { toUpperText } from '../lib/utils';
 import IncidentPhotoUpload from './IncidentPhotoUpload';
 import IncidentDetailsModal from './IncidentDetailsModal';
+import Toast from './Toast';
 
 interface IncidentsViewProps {
   incidents: Incident[];
@@ -75,6 +76,33 @@ export default function IncidentsView({
   // Replaying state
   const [replyText, setReplyText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const prevIncidentsRef = useRef<Incident[]>(incidents);
+
+  useEffect(() => {
+    if (prevIncidentsRef.current.length > 0 && currentUser.role === 'Morador') {
+      incidents.forEach(incident => {
+        const prevIncident = prevIncidentsRef.current.find(p => p.id === incident.id);
+        if (prevIncident) {
+          // Check for new replies
+          const incReplies = incident.replies || [];
+          const prevReplies = prevIncident.replies || [];
+          if (incReplies.length > prevReplies.length) {
+            const newReply = incReplies[incReplies.length - 1];
+            if (newReply && newReply.role !== 'Morador') {
+              setToastMessage(`Você recebeu uma nova resposta na ocorrência: "${incident.title}"`);
+            }
+          }
+          // Check for status change (only for non-Aberto status)
+          if (incident.status !== prevIncident.status && incident.status !== 'Aberto') {
+            setToastMessage(`O status da sua ocorrência "${incident.title}" mudou para ${incident.status}`);
+          }
+        }
+      });
+    }
+    prevIncidentsRef.current = incidents;
+  }, [incidents, currentUser.role]);
 
   const isMorador = currentUser.role === 'Morador';
 
@@ -459,15 +487,14 @@ export default function IncidentsView({
                 key={incident.id}
                 onClick={() => {
                   setSelectedIncident(incident);
-                  setExpandedIncident(incident);
                   setIsEditingIncident(false);
                 }}
                 className={`rounded-2xl border p-5 cursor-pointer hover:shadow-xs transition-shadow ${
                   selectedIncident?.id === incident.id ? 'bg-white border-slate-800 ring-1 ring-slate-800' : 
-                  incident.status === 'Resolvido' ? 'bg-emerald-100 border-emerald-300' : 
-                  incident.status === 'Em Andamento' ? 'bg-amber-100 border-amber-300' :
-                  incident.status === 'Aberto' ? 'bg-sky-100 border-sky-300' :
-                  incident.status === 'Pendente' ? 'bg-rose-100 border-rose-300' : 'bg-white border-gray-100'
+                  incident.status === 'Resolvido' ? 'bg-emerald-50/50 border-emerald-200' : 
+                  incident.status === 'Em Andamento' ? 'bg-amber-50/50 border-amber-200' :
+                  incident.status === 'Aberto' ? 'bg-rose-50/50 border-rose-200' :
+                  incident.status === 'Pendente' ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-gray-100'
                 }`}
               >
                 <div className="flex justify-between items-start gap-3">
@@ -504,11 +531,13 @@ export default function IncidentsView({
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
-                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase text-center shrink-0 ${
-                      incident.status === 'Aberto' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                      incident.status === 'Em Andamento' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                      'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider text-center flex items-center gap-1 shadow-sm shrink-0 ${
+                      incident.status === 'Aberto' ? 'bg-rose-500 text-white border border-rose-600' :
+                      incident.status === 'Em Andamento' ? 'bg-amber-400 text-amber-900 border border-amber-500' :
+                      incident.status === 'Resolvido' ? 'bg-emerald-500 text-white border border-emerald-600' :
+                      'bg-slate-500 text-white border border-slate-600'
                     }`}>
+                      {incident.status === 'Aberto' && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
                       {incident.status}
                     </span>
                   </div>
@@ -520,14 +549,17 @@ export default function IncidentsView({
 
                 {incident.photoUrls && incident.photoUrls.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-4">
-                    <img 
-                      src={incident.photoUrls[0]} 
-                      alt="Thumbnail da ocorrência" 
-                      className="w-16 h-16 rounded-lg object-cover border border-gray-200" 
-                    />
-                    {incident.photoUrls.length > 1 && (
-                      <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center border border-gray-200 text-xs text-gray-500 font-bold">
-                        +{incident.photoUrls.length - 1}
+                    {incident.photoUrls.slice(0, 3).map((url, i) => (
+                      <img 
+                        key={i}
+                        src={url} 
+                        alt={`Evidência da ocorrência ${i + 1}`} 
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover border border-gray-200 shadow-sm" 
+                      />
+                    ))}
+                    {incident.photoUrls.length > 3 && (
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-200 text-xs text-gray-500 font-bold shadow-sm">
+                        +{incident.photoUrls.length - 3}
                       </div>
                     )}
                   </div>
@@ -538,7 +570,15 @@ export default function IncidentsView({
                     <MessageSquare className={`w-3.5 h-3.5 ${incident.status === 'Resolvido' ? 'text-indigo-500' : ''}`} />
                     {(incident.replies || []).length} Respostas e Notificações
                   </span>
-                  <span className={`${incident.status === 'Resolvido' ? 'text-indigo-600' : 'text-sky-650'} hover:underline font-semibold font-sans`}>Ver Detalhes →</span>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedIncident(incident);
+                    }}
+                    className={`${incident.status === 'Resolvido' ? 'text-indigo-600' : 'text-sky-650'} hover:underline font-semibold font-sans cursor-pointer`}
+                  >
+                    Ver Detalhes →
+                  </button>
                 </div>
               </div>
             ))
@@ -663,7 +703,17 @@ export default function IncidentsView({
                   </div>
 
                   <h3 className="text-md font-bold text-gray-901 leading-snug">{selectedIncident.title}</h3>
-                  <p className="text-[10px] text-gray-450 mt-1">Unidade: {selectedIncident.unit} | Status: <strong className="uppercase text-slate-800">{selectedIncident.status}</strong></p>
+                  <p className="text-[10px] text-gray-450 mt-1 flex items-center gap-1.5">
+                    Unidade: {selectedIncident.unit} | Status: 
+                    <strong className={`uppercase px-2 py-0.5 rounded text-[9px] ${
+                      selectedIncident.status === 'Resolvido' ? 'bg-emerald-500 text-white' :
+                      selectedIncident.status === 'Em Andamento' ? 'bg-amber-400 text-amber-900' :
+                      selectedIncident.status === 'Aberto' ? 'bg-rose-500 text-white' :
+                      'bg-slate-500 text-white'
+                    }`}>
+                      {selectedIncident.status}
+                    </strong>
+                  </p>
                 </div>
 
                 {/* Original content message */}
@@ -673,7 +723,9 @@ export default function IncidentsView({
                   {selectedIncident.photoUrls && selectedIncident.photoUrls.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-4">
                       {selectedIncident.photoUrls.map((url, i) => (
-                        <img key={i} src={url} alt={`Evidência ${i + 1}`} className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity">
+                          <img src={url} alt={`Evidência ${i + 1}`} className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
+                        </a>
                       ))}
                     </div>
                   )}
@@ -864,6 +916,13 @@ export default function IncidentsView({
             </div>
           </div>
         </div>
+      )}
+      {toastMessage && (
+        <Toast 
+          message={toastMessage} 
+          type="info" 
+          onClose={() => setToastMessage(null)} 
+        />
       )}
       {expandedIncident && (
         <IncidentDetailsModal 

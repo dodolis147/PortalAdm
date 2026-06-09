@@ -72,11 +72,22 @@ export const isImageUrl = (url?: string): boolean => {
   return imageExtensions.some(ext => lowercaseUrl.includes(ext));
 };
 
-export const generateAccessCode = (length: number = 8): string => {
+export const generateAccessCode = (length: number = 4): string => {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+};
+
+export const parseUsageCount = (notes?: string): number => {
+  if (!notes) return 0;
+  const match = notes.match(/usageCount:(\d+)/);
+  return match ? parseInt(match[1]) : 0;
+};
+
+export const updateUsageCount = (notes: string | undefined, count: number): string => {
+  let baseNotes = notes ? notes.replace(/usageCount:\d+/, '').trim() : '';
+  return `${baseNotes} usageCount:${count}`.trim();
 };
