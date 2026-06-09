@@ -28,8 +28,6 @@ export default function AdminLockScreen({
   const [showPass, setShowPass] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isShaking, setIsShaking] = useState(false);
-  const [liveTime, setLiveTime] = useState('');
-  const [liveDate, setLiveDate] = useState('');
 
   // Extract custom login settings or fall back to template defaults
   const custom = loginCustomization || {
@@ -54,24 +52,7 @@ export default function AdminLockScreen({
   const model = custom.layout_model || 4;
 
   // Live clock tracker inside locked terminal
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setLiveTime(now.toLocaleTimeString('pt-BR', { hour12: false }));
-      
-      const options: Intl.DateTimeFormatOptions = { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      };
-      setLiveDate(now.toLocaleDateString('pt-BR', options));
-    };
-    
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  // REMOVED CLOCK TRACKER
 
   const handleUnlockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,13 +172,13 @@ export default function AdminLockScreen({
     let boxStyle: React.CSSProperties = {};
 
     if (model === 1) {
-      boxClass = "w-full max-w-md bg-zinc-950/75 backdrop-blur-md border border-zinc-850 p-8 rounded-3xl text-center space-y-5 shadow-2xl m-auto";
+      boxClass = "w-full max-w-xs bg-zinc-950/75 backdrop-blur-md border border-zinc-850 p-6 rounded-3xl text-center space-y-4 shadow-2xl m-auto";
     } else if (model === 4) {
-      boxClass = "w-full max-w-sm bg-zinc-900/90 backdrop-blur-md border border-zinc-800 p-8 rounded-3xl text-center space-y-5 shadow-2xl m-auto";
+      boxClass = "w-full max-w-xs bg-zinc-900/90 backdrop-blur-md border border-zinc-800 p-6 rounded-3xl text-center space-y-4 shadow-2xl m-auto";
     } else if (model === 5) {
-      boxClass = "w-full max-w-sm p-6 text-center space-y-5 m-auto"; // flat, ultra minimal
+      boxClass = "w-full max-w-xs p-4 text-center space-y-4 m-auto"; // flat, ultra minimal
     } else if (model === 6) {
-      boxClass = "w-full max-w-sm bg-zinc-950 border border-zinc-800 p-8 rounded-3xl text-center space-y-5 shadow-2xl relative overflow-hidden m-auto";
+      boxClass = "w-full max-w-xs bg-zinc-950 border border-zinc-800 p-6 rounded-3xl text-center space-y-4 shadow-2xl relative overflow-hidden m-auto";
     }
 
     return (
@@ -226,36 +207,15 @@ export default function AdminLockScreen({
                 referrerPolicy="no-referrer"
                 className="object-contain"
                 style={{
-                  height: `${(custom.logo_size || 100) * 0.45}px`,
-                  maxHeight: '140px'
+                  height: `${(custom.logo_size || 100) * 0.35}px`,
+                  maxHeight: '100px'
                 }}
               />
             </div>
-          ) : (
-            /* Glowing Shield Logo Placeholder if no logo is active */
-            <div className="relative select-none">
-              <div 
-                className="absolute -inset-1.5 rounded-full blur-md opacity-30 animate-pulse" 
-                style={{ backgroundColor: custom.primary_color }}
-              />
-              <div 
-                className="relative p-4 bg-slate-900 border border-zinc-800 rounded-full shadow-xl"
-                style={{ color: custom.primary_color }}
-              >
-                <Lock className="w-8 h-8 animate-pulse" />
-              </div>
-            </div>
-          )}
+          ) : null}
 
-          {/* System Time Center block */}
-          <div className="space-y-1">
-            <h2 className="text-4xl font-extrabold tracking-wider font-mono select-all" style={{ color: custom.primary_color }}>
-              {liveTime || '00:00:00'}
-            </h2>
-            <p className="text-[10px] text-zinc-500 capitalize tracking-wide font-mono select-all">
-              {liveDate}
-            </p>
-          </div>
+          {/* System Time Center block - REMOVED */}
+
 
           {/* Header Title block if Model 4 or 5 */}
           {(model === 1 || model === 4 || model === 5 || model === 6) && (
@@ -412,9 +372,6 @@ export default function AdminLockScreen({
           {/* Prompt Message and Version Footer */}
           <div className="pt-4 text-[9px] text-zinc-550 font-mono tracking-tight leading-normal uppercase">
             <p className="select-all">{custom.footer_text || 'Local Console Security Client v2.4 • Desenvolvido com Tecnologia IA'}</p>
-            {userIdInput === 'admin' && (
-              <p className="mt-1 normal-case tracking-normal">Dica: A senha padrão do Administrador Geral é <span className="text-blue-400 font-bold uppercase select-all bg-zinc-950 px-1 py-0.5 rounded">admin</span></p>
-            )}
           </div>
 
         </div>

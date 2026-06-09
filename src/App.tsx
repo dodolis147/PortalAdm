@@ -2509,7 +2509,7 @@ export default function App() {
     }
   };
 
-  const handleUnlockConsole = (userId: string, passwordInput: string): boolean => {
+  const handleUnlockConsole = React.useCallback((userId: string, passwordInput: string): boolean => {
     if (userId === 'admin') {
       if (passwordInput === adminPassword) {
         const adminUser = { id: 'admin', name: operatorName, role: 'Administrador' as const };
@@ -2527,7 +2527,7 @@ export default function App() {
     const found = residents.find(r => 
       !r.deleted_at && (
         r.id.toLowerCase() === searchUserId || 
-        (r.name && r.name.toLowerCase() === searchUserId) || 
+        (r.name && r.name.toLowerCase().includes(searchUserId)) || 
         (r.email && r.email.toLowerCase() === searchUserId)
       )
     );
@@ -2567,11 +2567,11 @@ export default function App() {
 
     addAuditLog('LOGIN_FAILED', 'Autenticação', found.id, null, null, 'Senha de morador informada incorretamente');
     return false;
-  };
+  }, [residents, adminPassword, operatorName, handleSetPanelLockedState, setCurrentUser, setActiveTab, addAuditLog]);
 
   // State manipulation Handlers
   // 1. Visitors Handlers
-  const handleAddVisitor = (newVisitor: Visitor) => {
+  const handleAddVisitor = React.useCallback((newVisitor: Visitor) => {
     // Validation: Check if there is an active visitor with the exact same document who is already 'Dentro'
     const cleanDoc = newVisitor.document?.trim();
     if (cleanDoc && newVisitor.status === 'Dentro') {
@@ -2602,7 +2602,7 @@ export default function App() {
       triggerCancelaRelease(withPin.name, withPin.vehiclePlate || undefined, 'visitor');
     }
     setToast({ message: 'Visitante cadastrado com sucesso!', type: 'success' });
-  };
+  }, [visitors, triggerCancelaRelease]);
 
   const handleAddVisitorFromResident = (visitorData: Omit<Visitor, 'id' | 'createdAt' | 'entryTime' | 'exitTime' | 'status'>) => {
     const valDuration = visitorData.validityDuration || '24h';
@@ -2908,7 +2908,7 @@ export default function App() {
     if (role === 'MASTER') return true;
     if (role === 'Administrador') return true;
     if (role === 'Porteiro') {
-      return ['dashboard', 'visitors', 'residents', 'incidents', 'encomendas', 'achados_perdidos'].includes(tab);
+      return ['dashboard', 'visitors', 'residents', 'incidents', 'encomendas', 'achados_perdidos', 'bookings'].includes(tab);
     }
     if (role === 'Morador') {
       return ['dashboard', 'bookings', 'announcements', 'incidents', 'encomendas', 'achados_perdidos'].includes(tab);

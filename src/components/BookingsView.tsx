@@ -390,8 +390,8 @@ export default function BookingsView({
       
       {/* Upper grid panel: Areas summary list */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="common-areas-bento">
-        {/* Adicionar nova área (Trigger) se for Administrador */}
-        {currentUser.role === 'Administrador' && (
+        {/* Adicionar nova área (Trigger) se for Administrador ou Porteiro */}
+        {(currentUser.role === 'Administrador' || currentUser.role === 'Porteiro') && (
           <div 
             onClick={handleOpenAddArea}
             className="bg-slate-50 border-2 border-dashed border-gray-200 rounded-2xl p-5 hover:border-slate-400 hover:bg-slate-100/30 transition-all cursor-pointer flex flex-col items-center justify-center text-center group h-80"
@@ -445,7 +445,7 @@ export default function BookingsView({
               )}
 
               {/* Admin Action Buttons on photo overlay */}
-              {currentUser.role === 'Administrador' && (
+              {(currentUser.role === 'Administrador' || currentUser.role === 'Porteiro') && (
                 <div className="absolute top-2 right-2 flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     type="button"
@@ -862,7 +862,7 @@ export default function BookingsView({
       <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Agenda Concluída de Uso</h3>
-          {(currentUser.role === 'Administrador' || currentUser.role === 'MASTER') && bookings.some(b => b.date < new Date().toISOString().split('T')[0] && b.status !== 'Cancelado') && (
+          {(currentUser.role === 'Administrador' || currentUser.role === 'MASTER' || currentUser.role === 'Porteiro') && bookings.some(b => b.date < new Date().toISOString().split('T')[0] && b.status !== 'Cancelado') && (
             <button
               onClick={() => {
                 const todayStr = new Date().toISOString().split('T')[0];
@@ -954,7 +954,7 @@ export default function BookingsView({
                       {/* Actions */}
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {booking.status === 'Pendente' && (currentUser.role === 'Administrador' || currentUser.role === 'MASTER') && (
+                          {booking.status === 'Pendente' && (currentUser.role === 'Administrador' || currentUser.role === 'MASTER' || currentUser.role === 'Porteiro') && (
                             <button
                               onClick={(e) => { e.stopPropagation(); onConfirmBooking(booking.id); }}
                               className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-2 py-1.5 rounded-lg text-xs font-semibold cursor-pointer shrink-0"
@@ -980,7 +980,7 @@ export default function BookingsView({
                           )}
 
                           {/* Delete button (Admin only) */}
-                          {(currentUser.role === 'Administrador' || currentUser.role === 'MASTER') && (
+                          {(currentUser.role === 'Administrador' || currentUser.role === 'MASTER' || currentUser.role === 'Porteiro') && (
                             <button
                                 onClick={(e) => {
                                   e.stopPropagation();

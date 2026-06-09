@@ -352,15 +352,19 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
                   </div>
                 ) : pendingItem.type === 'resident' ? (
                   // Resident Card details
-                   <div className="bg-zinc-950/40 border border-zinc-800 rounded-2xl p-4 space-y-3.5">
-                    <div className="flex items-start gap-3">
-                      <div className="p-3 bg-zinc-800 border border-zinc-750 text-zinc-300 rounded-xl">
-                        <Users className="w-6 h-6 text-blue-400" />
-                      </div>
+                  <div className="bg-zinc-950/40 border border-zinc-800 rounded-2xl p-4 space-y-4">
+                    <div className="flex items-center gap-4">
+                      {pendingItem.data.avatarUrl ? (
+                        <img src={pendingItem.data.avatarUrl} alt={pendingItem.data.name} className="w-16 h-16 rounded-full object-cover border border-zinc-700" />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+                          <span className="text-2xl font-black text-zinc-500">{pendingItem.data.name.charAt(0)}</span>
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <span className="text-[8px] uppercase font-bold tracking-widest text-zinc-500 block font-mono">Dados do Morador</span>
-                        <h4 className="text-sm font-black text-zinc-100 truncate mt-0.5">{pendingItem.data.name}</h4>
-                        <span className="inline-block mt-1 font-mono text-[8px] px-1.5 py-0.5 bg-zinc-800 text-zinc-350 rounded border border-zinc-700 font-bold uppercase">
+                        <h4 className="text-sm font-black text-zinc-100 truncate">{pendingItem.data.name}</h4>
+                        <span className="inline-block mt-0.5 font-mono text-[8px] px-1.5 py-0.5 bg-zinc-800 text-zinc-350 rounded border border-zinc-700 font-bold uppercase">
                           {pendingItem.data.role || 'Morador'}
                         </span>
                       </div>
@@ -373,6 +377,14 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
                       <div>
                         <span className="text-[8px] uppercase font-bold text-zinc-550 block font-mono">Contato</span>
                         <span className="text-zinc-300 text-[11px]">{pendingItem.data.phone}</span>
+                      </div>
+                      <div>
+                        <span className="text-[8px] uppercase font-bold text-zinc-550 block font-mono">Status</span>
+                        <span className="text-zinc-300 text-[11px] font-bold">{pendingItem.data.status}</span>
+                      </div>
+                      <div>
+                        <span className="text-[8px] uppercase font-bold text-zinc-550 block font-mono">CPF</span>
+                        <span className="text-zinc-300 text-[11px] font-mono">{pendingItem.data.cpf || 'N/A'}</span>
                       </div>
                     </div>
                   </div>

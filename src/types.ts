@@ -271,6 +271,13 @@ export interface LoginCustomization {
   updated_at: string;
   updated_by: string;
 }
+export interface PendingSyncItem {
+  id: string;
+  table: string;
+  action: 'upsert' | 'delete';
+  data: any;
+  retries?: number;
+}
 
 export class AppConfigError extends Error {
   constructor(message: string) {
