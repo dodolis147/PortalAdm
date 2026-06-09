@@ -7,6 +7,7 @@ export interface Repository<T> {
   upsert: (item: T) => Promise<T>;
   delete: (id: string) => Promise<void>;
   subscribe: (onUpdate: (data: T, type: 'INSERT' | 'UPDATE' | 'DELETE') => void) => () => void;
+  getLocalCache?: () => T[];
 }
 
 const VALID_DB_COLUMN_MAP: Record<string, string[]> = {
@@ -252,6 +253,7 @@ export function createRepository<T>(table: string): Repository<T> {
       return () => {
         supabase.removeChannel(channel);
       };
-    }
+    },
+    getLocalCache
   };
 }

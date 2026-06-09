@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import * as QRCode from 'qrcode';
+import QRCode from 'qrcode';
 
 interface ProceduralQRCodeProps {
   value: string;

@@ -119,7 +119,8 @@ export default function AnnouncementsView({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="announcements-tab-root">
       
       {/* Left Columns: Announcement Creation Panel */}
-      <div className="lg:col-span-1 space-y-6">
+      {isAdmin && (
+        <div className="lg:col-span-1 space-y-6">
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 pb-3 mb-4 border-b border-gray-100">
@@ -274,9 +275,10 @@ export default function AnnouncementsView({
           </form>
         )}
       </div>
+    )}
 
       {/* Right Column: Visual Mural stream */}
-      <div className="lg:col-span-2 space-y-4" id="announcements-mural-board">
+      <div className={isAdmin ? "lg:col-span-2 space-y-4" : "lg:col-span-3 space-y-4"} id="announcements-mural-board">
         <div className="flex items-center justify-between pb-2 border-b border-gray-100">
           <h3 className="text-lg font-bold text-gray-901">Mural Informativo do Condomínio</h3>
           <span className="text-xs bg-gray-100 text-gray-600 font-semibold px-2.5 py-1 rounded-full">

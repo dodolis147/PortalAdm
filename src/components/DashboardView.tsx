@@ -75,6 +75,19 @@ const [selectedIncident, setSelectedIncident] = React.useState<Incident | null>(
 const [lprPlate, setLprPlate] = React.useState('');
   const [activeQrCodeVisitor, setActiveQrCodeVisitor] = useState<Visitor | null>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (showAddForm) setShowAddForm(false);
+        if (selectedBookingForDetails) setSelectedBookingForDetails(null);
+        if (selectedIncident) setSelectedIncident(null);
+        if (activeQrCodeVisitor) setActiveQrCodeVisitor(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAddForm, selectedBookingForDetails, selectedIncident, activeQrCodeVisitor]);
+
   // Auto-authenticate LPR
   React.useEffect(() => {
     if (lprPlate.length === 7) {
@@ -439,6 +452,7 @@ const [lprPlate, setLprPlate] = React.useState('');
                           <th className="py-2.5 px-3">Status</th>
                           <th className="py-2.5 px-3">Tipo</th>
                           <th className="py-2.5 px-3">Data</th>
+                          <th className="py-2.5 px-3 text-center">QR</th>
                           <th className="py-2.5 px-3 text-right">Código</th>
                           <th className="py-2.5 px-3 text-right">Compartilhar</th>
                         </tr>
@@ -462,12 +476,12 @@ const [lprPlate, setLprPlate] = React.useState('');
                               )}
                             </td>
                             <td className="py-3 px-3">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase whitespace-nowrap ${
                                 visitor.status === 'Dentro' ? 'bg-emerald-50 text-emerald-700' :
                                 visitor.status === 'Pre-Autorizado' ? 'bg-sky-50 text-sky-700' : 
                                 visitor.status === 'Saiu' ? 'bg-gray-50 text-gray-600' : 'bg-rose-50 text-rose-700'
                               }`}>
-                                {visitor.status}
+                                {visitor.status === 'Pre-Autorizado' ? 'PRE-AUT' : visitor.status}
                               </span>
                             </td>
                             <td className="py-3 px-3">
@@ -475,6 +489,9 @@ const [lprPlate, setLprPlate] = React.useState('');
                             </td>
                             <td className="py-3 px-3 text-right text-xs text-gray-500 font-mono">
                               {new Date(visitor.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            </td>
+                            <td className="py-3 px-3 text-center cursor-pointer" onClick={() => setActiveQrCodeVisitor(visitor)}>
+                               <ProceduralQRCode value={`express-${visitor.id}`} size={32} />
                             </td>
                             <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">
                                {visitor.exitCode || '---'}

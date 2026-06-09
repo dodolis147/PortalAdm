@@ -463,18 +463,20 @@ export default function EncomendasView({
                 }`}>
                   <div className="flex items-center">
                     <span className="font-mono text-xs font-black text-gray-900 tracking-wider">
-                      {encomenda.codigoRastreio}
+                      {['Morador', 'Administrador', 'MASTER'].includes(currentUser?.role || '') ? encomenda.codigoRastreio : '*** MASCARADO ***'}
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigator.clipboard.writeText(encomenda.codigoRastreio);
-                        alert('Código copiado!');
-                      }}
-                      className="ml-2 text-[9px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-sky-200"
-                    >
-                      Copiar
-                    </button>
+                    {['Morador', 'Administrador', 'MASTER'].includes(currentUser?.role || '') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(encomenda.codigoRastreio);
+                          alert('Código copiado!');
+                        }}
+                        className="ml-2 text-[9px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-sky-200"
+                      >
+                        Copiar
+                      </button>
+                    )}
                   </div>
                   
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -597,17 +599,19 @@ export default function EncomendasView({
                     {/* Codigo */}
                     <td className="px-5 py-4 font-mono text-xs font-black text-gray-900 tracking-wider">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
-                        <span>{encomenda.codigoRastreio}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard.writeText(encomenda.codigoRastreio);
-                            alert('Código copiado!');
-                          }}
-                          className="text-[9px] bg-sky-100/85 text-sky-700 px-1.5 py-0.5 rounded hover:bg-sky-200 transition-colors cursor-pointer"
-                        >
-                          Copiar
-                        </button>
+                        <span>{['Morador', 'Administrador', 'MASTER'].includes(currentUser?.role || '') ? encomenda.codigoRastreio : '***'}</span>
+                        {['Morador', 'Administrador', 'MASTER'].includes(currentUser?.role || '') && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(encomenda.codigoRastreio);
+                              alert('Código copiado!');
+                            }}
+                            className="text-[9px] bg-sky-100/85 text-sky-700 px-1.5 py-0.5 rounded hover:bg-sky-200 transition-colors cursor-pointer"
+                          >
+                            Copiar
+                          </button>
+                        )}
                       </div>
                     </td>
 
@@ -948,7 +952,7 @@ export default function EncomendasView({
                   <div>
                     <span className="text-[10px] font-bold text-gray-400 uppercase font-mono block">Código de Rastreio</span>
                     <h4 className="text-lg font-black tracking-wider text-gray-900 font-mono">
-                      {selectedEncomenda.codigoRastreio}
+                      {['Morador', 'Administrador', 'MASTER'].includes(currentUser?.role || '') ? selectedEncomenda.codigoRastreio : '***'}
                     </h4>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
@@ -1040,7 +1044,7 @@ export default function EncomendasView({
                   </span>
                   
                   {isMorador ? (
-                    <ProceduralQRCode value={selectedEncomenda.qrCodeValue} size={140} />
+                    <ProceduralQRCode value={selectedEncomenda.qrCodeValue || 'PENDENTE'} size={140} />
                   ) : (
                     <div className="w-[140px] h-[140px] bg-slate-100 border border-slate-200 rounded-lg flex flex-col items-center justify-center p-3 text-slate-400 relative overflow-hidden">
                       <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#002_1px,transparent_1px)] [background-size:16px_16px]"></div>

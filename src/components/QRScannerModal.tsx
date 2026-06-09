@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, X, CheckCircle, AlertTriangle, RefreshCw, Volume2, ShieldCheck, Sparkles, ArrowRight, UserCheck, Package } from 'lucide-react';
+import { Camera, X, CheckCircle, AlertTriangle, RefreshCw, Volume2, ShieldCheck, Sparkles, ArrowRight, UserCheck, Package, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface QRScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onScanSuccess: (decodedText: string, confirmStep?: boolean, extraData?: any) => Promise<{ success: boolean; message: string; type: 'visitor' | 'package' | 'unknown'; data?: any }>;
+  onScanSuccess: (decodedText: string, confirmStep?: boolean, extraData?: any) => Promise<{ success: boolean; message: string; type: 'visitor' | 'package' | 'resident' | 'unknown'; data?: any }>;
 }
 
 export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRScannerModalProps) {
@@ -19,7 +19,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
   const [manualModeActive, setManualModeActive] = useState<boolean>(false);
   const [receiverName, setReceiverName] = useState<string>('');
   
-  const [pendingItem, setPendingItem] = useState<{ type: 'visitor' | 'package'; data: any; decodedText: string } | null>(null);
+  const [pendingItem, setPendingItem] = useState<{ type: 'visitor' | 'package' | 'resident'; data: any; decodedText: string } | null>(null);
   const [confirmingLoading, setConfirmingLoading] = useState(false);
   
   const qrRef = useRef<Html5Qrcode | null>(null);
@@ -61,7 +61,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
       const result = await onScanSuccess(code, false, {});
       if (result.success && result.data) {
         setPendingItem({
-          type: result.type as 'visitor' | 'package',
+          type: result.type as 'visitor' | 'package' | 'resident',
           data: result.data,
           decodedText: code
         });
@@ -198,7 +198,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
             const result = await onScanSuccess(decodedText, false, {});
             if (result.success && result.data) {
               setPendingItem({
-                type: result.type as 'visitor' | 'package',
+                type: result.type as 'visitor' | 'package' | 'resident',
                 data: result.data,
                 decodedText
               });
@@ -348,6 +348,32 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRSca
                           Obs: {pendingItem.data.notes || pendingItem.data.observacoes}
                         </div>
                       )}
+                    </div>
+                  </div>
+                ) : pendingItem.type === 'resident' ? (
+                  // Resident Card details
+                   <div className="bg-zinc-950/40 border border-zinc-800 rounded-2xl p-4 space-y-3.5">
+                    <div className="flex items-start gap-3">
+                      <div className="p-3 bg-zinc-800 border border-zinc-750 text-zinc-300 rounded-xl">
+                        <Users className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[8px] uppercase font-bold tracking-widest text-zinc-500 block font-mono">Dados do Morador</span>
+                        <h4 className="text-sm font-black text-zinc-100 truncate mt-0.5">{pendingItem.data.name}</h4>
+                        <span className="inline-block mt-1 font-mono text-[8px] px-1.5 py-0.5 bg-zinc-800 text-zinc-350 rounded border border-zinc-700 font-bold uppercase">
+                          {pendingItem.data.role || 'Morador'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 border-t border-zinc-800/65 pt-3 text-xs leading-normal">
+                      <div>
+                        <span className="text-[8px] uppercase font-bold text-zinc-550 block font-mono">Unidade</span>
+                        <span className="font-mono font-bold text-zinc-300">{pendingItem.data.unit}</span>
+                      </div>
+                      <div>
+                        <span className="text-[8px] uppercase font-bold text-zinc-550 block font-mono">Contato</span>
+                        <span className="text-zinc-300 text-[11px]">{pendingItem.data.phone}</span>
+                      </div>
                     </div>
                   </div>
                 ) : (

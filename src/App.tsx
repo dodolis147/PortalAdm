@@ -234,7 +234,7 @@ const sanitizePayload = (table: string, data: any): any => {
 };
 
 export default function App() {
-  const envConfig = getConfig();
+  const envConfig = React.useMemo(() => getConfig(), []);
   const [bypassOverlay, setBypassOverlay] = useLocalStoragePersistence<boolean>('bypass_config_overlay', false);
   const showConfigOverlay = !envConfig.supabaseConfigured && !bypassOverlay;
   
@@ -255,6 +255,51 @@ export default function App() {
   useEffect(() => {
     pendingSyncQueueRef.current = pendingSyncQueue;
   }, [pendingSyncQueue]);
+
+  useEffect(() => {
+    async function syncEnvKeys() {
+      try {
+        const res = await fetch('/api/env');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.supabaseUrl && data.supabaseAnonKey) {
+            const currentUrl = localStorage.getItem('__SUPABASE_URL') || '';
+            const currentAnon = localStorage.getItem('__SUPABASE_ANON_KEY') || '';
+            if (data.supabaseUrl !== currentUrl || data.supabaseAnonKey !== currentAnon) {
+              console.log("[ENV_SYNC] Syncing keys from server:", data.supabaseUrl);
+              localStorage.setItem('__SUPABASE_URL', data.supabaseUrl);
+              localStorage.setItem('__SUPABASE_ANON_KEY', data.supabaseAnonKey);
+              (window as any).__SUPABASE_URL = data.supabaseUrl;
+              (window as any).__SUPABASE_ANON_KEY = data.supabaseAnonKey;
+              window.location.reload();
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[ENV_SYNC] Error syncing keys from server:", err);
+      }
+    }
+    syncEnvKeys();
+  }, []);
+
+  // Idle Preload Tab Views Effect to guarantee instant zero-latency tab switching
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log("[PRELOAD] Prefetching lazy-load tab bundles in the background...");
+      import('./components/DashboardView').catch(() => {});
+      import('./components/VisitorsView').catch(() => {});
+      import('./components/ResidentsView').catch(() => {});
+      import('./components/BookingsView').catch(() => {});
+      import('./components/AnnouncementsView').catch(() => {});
+      import('./components/IncidentsView').catch(() => {});
+      import('./components/EncomendasView').catch(() => {});
+      import('./components/AchadosPerdidosView').catch(() => {});
+      import('./components/AuditLogDashboard').catch(() => {});
+      import('./components/AdminSettingsModal').catch(() => {});
+      import('./components/ThemeCustomizerDrawer').catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
   const syncInProgressRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
@@ -268,6 +313,7 @@ export default function App() {
   const lastWriteTimeRef = useRef<number>(0);
   const isDirectChannelOfflineRef = useRef<boolean>(false);
   const lastFullFetchTimeRef = useRef<number>(Date.now());
+  const verifiedTablesRef = useRef<Record<string, boolean>>({});
 
   const [syncLogs, setSyncLogs] = useDexiePersistence<{ id: string; timestamp: string; type: 'success' | 'error' | 'warning'; msg: string }[]>('syncLogs', []);
 
@@ -781,13 +827,37 @@ export default function App() {
     };
   });
 
-  useEffect(() => {
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-  }, [currentUser]);
   const [isPanelLocked, setIsPanelLocked] = useState<boolean>(() => localStorage.getItem('isUnlocked') !== 'true');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isThemeDrawerOpen, setIsThemeDrawerOpen] = useState<boolean>(false);
-  const [themeSettings, setThemeSettings] = useDexiePersistence<ThemeSettings>('themeSettings', DEFAULT_THEME_SETTINGS);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [currentModalAnnouncement, setCurrentModalAnnouncement] = useState<Announcement | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (isSettingsOpen) setIsSettingsOpen(false);
+        if (isThemeDrawerOpen) setIsThemeDrawerOpen(false);
+        if (isQRScannerOpen) setIsQRScannerOpen(false);
+        if (isProfileModalOpen) setIsProfileModalOpen(false);
+        if (currentModalAnnouncement) setCurrentModalAnnouncement(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSettingsOpen, isThemeDrawerOpen, isQRScannerOpen, isProfileModalOpen, currentModalAnnouncement]);
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>(() => {
+    const saved = localStorage.getItem('theme_settings');
+    if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+    }
+    return DEFAULT_THEME_SETTINGS;
+  });
   const [loginCustomization, setLoginCustomization] = useDexiePersistence<LoginCustomization>('loginCustomization', DEFAULT_LOGIN_CUSTOMIZATION);
   const [incidentCategories, setIncidentCategories] = useDexiePersistence<string[]>('incidentCategories', [
     'Barulho', 
@@ -801,42 +871,7 @@ export default function App() {
   const [retentionDays, setRetentionDays] = useLocalStoragePersistence<number>('retentionDays', 30);
 
 
-  // Realtime synchronization subscriptions
-  useEffect(() => {
-    const tables = [
-      { name: 'residents', setter: setResidents },
-      { name: 'visitors', setter: setVisitors },
-      { name: 'bookings', setter: setBookings },
-      { name: 'announcements', setter: setAnnouncements },
-      { name: 'incidents', setter: setIncidents },
-      { name: 'encomendas', setter: setEncomendas },
-      { name: 'achados_perdidos', setter: setAchadosPerdidos },
-    ];
 
-    const subscriptions = tables.map(tableConfig => {
-      return supabase
-        .channel(`${tableConfig.name}-realtime`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: tableConfig.name }, (payload: any) => {
-          console.log(`[REALTIME] Update na tabela ${tableConfig.name}:`, payload);
-          
-          if (payload.eventType === 'INSERT') {
-            tableConfig.setter((prev: any[]) => [...prev, toCamelCase(payload.new)]);
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedNew = toCamelCase(payload.new);
-            tableConfig.setter((prev: any[]) => prev.map(item => item.id === updatedNew.id ? { ...item, ...updatedNew } : item));
-          } else if (payload.eventType === 'DELETE') {
-            tableConfig.setter((prev: any[]) => prev.filter(item => item.id !== payload.old.id));
-          }
-        })
-        .subscribe();
-    });
-
-    return () => {
-      subscriptions.forEach(sub => {
-        supabase.removeChannel(sub);
-      });
-    };
-  }, [supabase, setResidents, setVisitors, setBookings, setAnnouncements, setIncidents, setEncomendas, setAchadosPerdidos]);
 
   // Computed Active Lists for all modules (excludes any soft deleted entries)
   const activeResidents = React.useMemo(() => residents.filter(r => !r.deleted_at), [residents]);
@@ -848,9 +883,6 @@ export default function App() {
   const activeEncomendas = React.useMemo(() => encomendas.filter(e => !e?.deleted_at), [encomendas]);
   const activeAchadosPerdidos = React.useMemo(() => achadosPerdidos.filter(a => !a.deleted_at), [achadosPerdidos]);
 
-  const [isQRScannerOpen, setIsQRScannerOpen] = useState<boolean>(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
-  
   // Cancela / Portaria gate trigger state
   const [cancelaReleaseActive, setCancelaReleaseActive] = useState<boolean>(false);
   const [cancelaReleaseName, setCancelaReleaseName] = useState<string>('');
@@ -859,7 +891,6 @@ export default function App() {
 
   // Announcement popup state
   const [viewedAnnouncements, setViewedAnnouncements] = useLocalStoragePersistence<string[]>('viewed_announcements', []);
-  const [currentModalAnnouncement, setCurrentModalAnnouncement] = useState<Announcement | null>(null);
 
   useEffect(() => {
     if (currentUser.role === 'Morador' && activeAnnouncements.length > 0) {
@@ -990,7 +1021,7 @@ export default function App() {
     };
   }, [currentUser]);
 
-  const handleScanSuccess = async (decodedText: string, confirmStep?: boolean, extraData?: any): Promise<{ success: boolean; message: string; type: 'visitor' | 'package' | 'unknown'; data?: any }> => {
+  const handleScanSuccess = async (decodedText: string, confirmStep?: boolean, extraData?: any): Promise<{ success: boolean; message: string; type: 'visitor' | 'package' | 'resident' | 'unknown'; data?: any }> => {
     const textClean = decodedText.trim();
     
     // 1. Check if scanned QR matches an Encomenda qrCodeValue or tracking code
@@ -1103,7 +1134,36 @@ export default function App() {
        };
     }
 
-    // 3. Unrecognized QRCode code
+    // 3. Check if scanned QR matches a Resident
+    const matchedResident = residents.find(res => {
+      const scanVal = textClean.trim().toUpperCase();
+      return (res.qrCodeValue && res.qrCodeValue.trim().toUpperCase() === scanVal) || 
+             (res.id.toLowerCase() === textClean.trim().toLowerCase());
+    });
+
+    if (matchedResident) {
+      if (!confirmStep) {
+        // Stage 1 pre-confirmation
+        return {
+          success: true,
+          message: 'Morador identificado.',
+          type: 'resident',
+          data: matchedResident
+        };
+      }
+
+      // Access logic
+      triggerCancelaRelease(`ACESSO LIBERADO: ${matchedResident.name} (${matchedResident.unit})`, undefined, 'visitor');
+      setToast({ message: `ACESSO LIBERADO: ${matchedResident.name}!`, type: 'success' });
+      return {
+        success: true,
+        message: `ACESSO LIBERADO: ${matchedResident.name} (${matchedResident.unit})`,
+        type: 'resident',
+        data: matchedResident
+      };
+    }
+
+    // 4. Unrecognized QRCode code
     return {
       success: false,
       message: `Código escaneado não cadastrado no sistema de Segurança Integrada: "${textClean}". Certifique-se de escanear um QRCode válido.`,
@@ -1217,9 +1277,10 @@ export default function App() {
       }, 2, 300, `Supabase Direct: ${table}`);
       
       // If direct access returned empty, check via proxy to avoid silent RLS blocking
-      if (data && data.length === 0) {
+      if (data && data.length === 0 && !verifiedTablesRef.current[table]) {
         console.log(`[SYNCHRONIZER] Tabela direta '${table}' retornou 0 resultados. Consultando Express API Proxy para checar se RLS bloqueia canais anônimos...`);
         const proxyData = await fetchFallbackProxy(table);
+        verifiedTablesRef.current[table] = true;
         if (proxyData && proxyData.length > 0) {
           addSyncLog('warning', `Possível Row-Level-Security (RLS) restritivo ou omitido na API direta para '${table}'. Usando dados seguros resgatados via Express Proxy (Service Role Bypass).`);
           return proxyData;
@@ -2188,6 +2249,7 @@ export default function App() {
     const oldSettings = themeSettings;
     const settingsWithId = { ...newSettings, id: 'active' };
     setThemeSettings(settingsWithId);
+    localStorage.setItem('theme_settings', JSON.stringify(settingsWithId));
     addAuditLog('UPDATE', 'Configurações', 'theme_settings', oldSettings, settingsWithId);
     addToSyncQueue('app_config', 'upsert', {
       key: 'theme_settings',
@@ -2524,8 +2586,17 @@ export default function App() {
       ...newVisitor,
       exitCode: newVisitor.exitCode || Math.floor(1000 + Math.random() * 9000).toString()
     };
-    const updated = [withPin, ...visitors];
-    saveVisitors(updated);
+    
+    // Optimistic update
+    lastWriteTimeRef.current = Date.now();
+    setVisitors(prev => [withPin, ...prev]);
+    
+    // Sync to DB
+    visitorsRepository.upsert(withPin).catch(e => {
+      console.error("[SYNC_ERROR] Falha na gravação de visitantes:", e);
+      setToast({ message: 'Falha na sincronização.', type: 'warning' });
+    });
+
     addAuditLog('CREATE', 'Visitantes', newVisitor.id, undefined, withPin);
     if (withPin.status === 'Dentro') {
       triggerCancelaRelease(withPin.name, withPin.vehiclePlate || undefined, 'visitor');
@@ -2845,15 +2916,18 @@ export default function App() {
     return false;
   };
 
-  const myPendingEncomendas = currentUser?.role === 'Morador' ? encomendas.filter(enc => 
-    enc.status === 'Pendente' && 
-    (enc.moradorId === currentUser.id || 
-     (currentUser.unit && (
-       currentUser.unit.toLowerCase().includes(enc.apartamento.toLowerCase()) || 
-       enc.apartamento.toLowerCase().includes(currentUser.unit.toLowerCase()) ||
-       `${enc.torre} - Apt ${enc.apartamento}` === currentUser.unit
-     )))
-  ) : [];
+  const myPendingEncomendas = currentUser?.role === 'Morador' ? encomendas.filter(enc => {
+    const apt = enc.apartamento || '';
+    const tower = enc.torre || '';
+    const unit = currentUser.unit || '';
+    return enc.status === 'Pendente' && 
+      (enc.moradorId === currentUser.id || 
+       (unit && (
+         unit.toLowerCase().includes(apt.toLowerCase()) || 
+         apt.toLowerCase().includes(unit.toLowerCase()) ||
+         `${tower} - Apt ${apt}` === unit
+       )));
+  }) : [];
 
 
   if (showConfigOverlay) {
@@ -3162,6 +3236,12 @@ export default function App() {
                   </span>
                 </div>
               </div>
+              {/* QR Code for Resident */}
+              {currentUser.role === 'Morador' && residents.find(r => r.id === currentUser.id)?.qrCodeValue && (
+                <div className="mr-1">
+                   <ProceduralQRCode value={residents.find(r => r.id === currentUser.id)!.qrCodeValue!} size={32} />
+                </div>
+              )}
               {/* User Avatar - Conditional rendering with photo or initials */}
               <div className="w-8 h-8 rounded-full bg-slate-900 text-white overflow-hidden flex items-center justify-center font-mono font-black text-[11px] tracking-tight leading-none uppercase shrink-0 border border-slate-700 shadow-xs">
                 {(currentUser.role === 'Morador' ? residents.find(r => r.id === currentUser.id)?.avatarUrl : operatorAvatarUrl) ? (
@@ -3437,7 +3517,7 @@ export default function App() {
 
               <div className="space-y-2">
                 <h2 className="text-3xl font-black uppercase tracking-wider text-white">
-                  {cancelaReleaseType === 'visitor' ? 'Visitante Liberado!' : cancelaReleaseType === 'package' ? 'Encomenda Entregue!' : 'Cancela Liberada!'}
+                  {cancelaReleaseType === 'visitor' ? 'Visitante Liberado!' : 'Encomenda Entregue!'}
                 </h2>
                 <div className="h-1 w-24 bg-emerald-400 mx-auto rounded-full" />
                 <p className="text-xs uppercase font-extrabold tracking-widest text-emerald-200 font-mono mt-2 animate-pulse">
@@ -3490,7 +3570,7 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.9, y: 50 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 50 }}
-            className="fixed bottom-5 right-5 z-[500] max-w-sm w-full bg-slate-900 border border-rose-500 rounded-2xl p-4 shadow-[0_10px_35px_rgba(244,63,94,0.6)] flex gap-3 text-white overflow-hidden"
+            className="fixed top-1 md:top-24 inset-x-2 md:inset-x-auto md:right-5 z-[9999999] md:max-w-sm w-full md:w-auto bg-slate-950 border-2 border-rose-500 rounded-2xl p-4 shadow-[0_0_50px_rgba(244,63,94,0.6)] flex gap-3 text-white overflow-hidden pointer-events-auto"
           >
             {/* Pulsating colorful halo */}
             <div className="absolute top-0 left-0 w-1.5 h-full bg-linear-to-b from-rose-600 via-orange-500 to-amber-500 animate-pulse" />

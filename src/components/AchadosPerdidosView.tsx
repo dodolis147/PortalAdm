@@ -240,12 +240,13 @@ export default function AchadosPerdidosView({
         canvas.height = height;
 
         const ctx = canvas.getContext('2d');
-        if (ctx) {
+        if (!ctx) {
+          console.error("[AchadosPerdidosView] ctx was null in handleCompressFile!");
+          callback(e.target?.result as string);
+        } else {
           ctx.drawImage(img, 0, 0, width, height);
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
           callback(compressedBase64);
-        } else {
-          callback(e.target?.result as string);
         }
       };
       img.src = e.target?.result as string;
@@ -299,21 +300,23 @@ export default function AchadosPerdidosView({
       canvas.width = video.videoWidth || 640;
       canvas.height = video.videoHeight || 480;
       const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        
-        if (activeCameraType === 'new-item') {
-          setNewItemPhotos(prev => [...prev, dataUrl]);
-        } else if (activeCameraType === 'delivery') {
-          setDeliveryPhoto(dataUrl);
-        } else if (activeCameraType === 'claim') {
-          setClaimDocFile(dataUrl);
-        }
-        
-        displayToast('Foto capturada com sucesso!');
-        stopCamera();
+      if (!ctx) {
+        console.error("[AchadosPerdidosView] ctx was null in capturePhoto!");
+        return;
       }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        
+      if (activeCameraType === 'new-item') {
+        setNewItemPhotos(prev => [...prev, dataUrl]);
+      } else if (activeCameraType === 'delivery') {
+        setDeliveryPhoto(dataUrl);
+      } else if (activeCameraType === 'claim') {
+        setClaimDocFile(dataUrl);
+      }
+        
+      displayToast('Foto capturada com sucesso!');
+      stopCamera();
     }
   };
 
@@ -330,9 +333,15 @@ export default function AchadosPerdidosView({
   // Signature canvas handlers
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.error("[AchadosPerdidosView] canvas element was null in startDrawing!");
+      return;
+    }
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error("[AchadosPerdidosView] ctx was null in startDrawing!");
+      return;
+    }
 
     setIsDrawing(true);
     ctx.beginPath();
@@ -343,9 +352,15 @@ export default function AchadosPerdidosView({
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.error("[AchadosPerdidosView] canvas element was null in draw!");
+      return;
+    }
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error("[AchadosPerdidosView] ctx was null in draw!");
+      return;
+    }
 
     const pos = getCoordinates(e, canvas);
     ctx.lineTo(pos.x, pos.y);
@@ -360,9 +375,15 @@ export default function AchadosPerdidosView({
 
   const clearSignature = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.error("[AchadosPerdidosView] canvas element was null in clearSignature!");
+      return;
+    }
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error("[AchadosPerdidosView] ctx was null in clearSignature!");
+      return;
+    }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 

@@ -8,6 +8,31 @@
     <script>
       (function() {
         try {
+          var saved = localStorage.getItem('theme_settings');
+          if (saved) {
+            var settings = JSON.parse(saved);
+            var style = document.createElement('style');
+            style.innerHTML = `
+              :root {
+                --app-bg: ${settings.customBg || '#f8fafc'} !important;
+                --app-card-bg: ${settings.customCardBg || '#ffffff'} !important;
+                --app-text: ${settings.customText || '#0f172a'} !important;
+                --app-text-muted: ${settings.customTextMuted || '#475569'} !important;
+                --app-border: ${settings.customBorder || '#cbd5e1'} !important;
+                --app-accent: ${settings.customAccent || '#2563eb'} !important;
+                --app-accent-hover: ${settings.customAccent || '#2563eb'}e0 !important;
+              }
+            `;
+            document.head.appendChild(style);
+          }
+        } catch (e) {
+          console.error('[Theme Loader] Exception during theme check:', e);
+        }
+      })();
+    </script>
+    <script>
+      (function() {
+        try {
           if (typeof window !== 'undefined') {
             if (!window.crypto) {
               Object.defineProperty(window, 'crypto', {
@@ -31,17 +56,7 @@
                 });
                 console.log('[Polyfill] Successfully registered fallback crypto.randomUUID');
               } catch (err) {
-                try {
-                  window.crypto.randomUUID = function() {
-                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                      var r = (Math.random() * 16) | 0;
-                      var v = c === 'x' ? r : (r & 0x3) | 0x8;
-                      return v.toString(16);
-                    });
-                  };
-                } catch (assignErr) {
-                  console.error('[Polyfill] Failed to write window.crypto.randomUUID', assignErr);
-                }
+                // ...
               }
             }
           }

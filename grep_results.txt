@@ -1,0 +1,24 @@
+52:  const [selectedEncomenda, setSelectedEncomenda] = useState<Encomenda | null>(null);
+231:    if (!selectedEncomenda) return;
+237:    const targetTracking = (selectedEncomenda.codigoRastreio || '').trim().toUpperCase();
+246:    onDeliverEncomenda(selectedEncomenda.id, {
+930:      {selectedEncomenda && (
+955:                      {selectedEncomenda.codigoRastreio}
+959:                    selectedEncomenda.status === 'Entregue'
+963:                    {selectedEncomenda.status === 'Entregue' ? '✓ Retirado / Entregue' : '⌛ Aguardando Retirada'}
+970:                  {selectedEncomenda.fotoUrl ? (
+972:                      src={selectedEncomenda.fotoUrl} 
+992:                      <strong className="text-gray-900">{selectedEncomenda.moradorNome}</strong>
+996:                      <strong className="text-gray-900">{selectedEncomenda.torre} - Ap {selectedEncomenda.apartamento}</strong>
+1000:                      <strong className="text-gray-900">{selectedEncomenda.responsavelRecebimento}</strong>
+1005:                        {new Date(selectedEncomenda.dataRecebimento).toLocaleString('pt-BR')}
+1010:                  {selectedEncomenda.observacoes && (
+1014:                        "{selectedEncomenda.observacoes}"
+1026:                        onRemoveEncomenda(selectedEncomenda.id!);
+1047:                    <ProceduralQRCode value={selectedEncomenda.qrCodeValue || 'PENDENTE'} size={140} />
+1060:                      {isMorador ? selectedEncomenda.qrCodeValue : 'RETIRAR-******'}
+1071:                {selectedEncomenda.status === 'Pendente' ? (
+1077:                        Seu pacote já está sob a guarda de nossa portaria inteligente. Apresente o QRCode ao porteiro de plantão <strong>({selectedEncomenda.responsavelRecebimento})</strong> para que ele possa conferir e liberar o item para você.
+1161:                        <span className="opacity-75">Entregue para:</span> <strong className="text-emerald-950">{selectedEncomenda.quemRetirou}</strong>
+1164:                        <span className="opacity-75">Liberado por:</span> <strong className="text-emerald-950">{selectedEncomenda.responsavelEntrega}</strong>
+1168:                          {selectedEncomenda.dataRetirada && new Date(selectedEncomenda.dataRetirada).toLocaleString('pt-BR')}

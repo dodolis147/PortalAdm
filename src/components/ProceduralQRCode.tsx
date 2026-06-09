@@ -5,6 +5,12 @@ export function ProceduralQRCode({ value, size = 120 }: { value: string; size?: 
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   useEffect(() => {
+    console.log("[DEBUG] ProceduralQRCode rendering with value:", value);
+    if (!value) {
+      setQrDataUrl('');
+      return;
+    }
+    
     let active = true;
     QRCode.toDataURL(value, {
       margin: 1,
