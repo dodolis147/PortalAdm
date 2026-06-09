@@ -1,0 +1,53 @@
+89:            console.error(`Error parsing localStorage key ${key}`, e);
+98:            console.error(`Error saving to localStorage key ${key}:`, e);
+155:    'id', 'created_at', 'user_id', 'user_name', 'action', 'module', 'record_id', 'old_data', 'new_data', 'ip_address', 'user_agent', 'error_message', 'stack_trace', 'restored_by', 'restored_at'
+192:  // Preemptive validation for any tables containing UUID fields to avoid Postgres casting syntax errors
+267:  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
+280:  const [syncLogs, setSyncLogs] = useDexiePersistence<{ id: string; timestamp: string; type: 'success' | 'error' | 'warning'; msg: string }[]>('syncLogs', []);
+282:  const addSyncLog = (type: 'success' | 'error' | 'warning', msg: string) => {
+370:            const { data: parentRecord, error: checkError } = await supabase
+377:              addSyncLog('error', `[INTEGRIDADE ERROR] Erro de rede ao buscar objeto pai '${objetoId}': ${checkError.message}`);
+383:              addSyncLog('error', `[REGISTRO ÓRFÃO] Objeto principal de ID '${objetoId}' não existe no banco de dados para '${item.table}'. Descartando item com falha de integridade garantida.`);
+394:        let error = null;
+471:              addSyncLog('error', `[SINTAXE_CONFIG] Erro permanente de validação na tabela 'announcements': ${validationErr.message}. Arquivo pulado.`);
+541:              error = new Error(errBody.error || `Falha ao salvar via API Express: status ${response.status}`);
+555:                  error = new Error(errBody.error || `Failed to save via server API: status ${response.status}`);
+558:                const { error: upsertError } = await supabase.from(item.table).upsert(syncData);
+574:                  error = new Error(errBody.error || `Falha na API Express após falha direta: status ${response.status}`);
+576:                  error = null;
+580:                error = new Error(`Falha no canal direto e na API de Fallback Express: ${directErr.message || directErr} // ${fallbackErr.message || fallbackErr}`);
+594:              error = new Error(errBody.error || `Falha ao deletar via API Express: status ${response.status}`);
+606:                  error = new Error(errBody.error || `Failed to delete via server API: status ${response.status}`);
+609:                const { error: deleteError } = await supabase.from(item.table).delete().eq('id', item.data);
+624:                  error = new Error(errBody.error || `Falha na API Express após falha direta ao deletar: status ${response.status}`);
+626:                  error = null;
+629:                error = new Error(`Falha no canal direto e na API de Fallback Express (Delete): ${directErr.message || directErr} // ${fallbackErr.message || fallbackErr}`);
+635:        if (error) {
+636:          throw error;
+644:        console.error(`[SYNC_ERROR] Falha de sincronização no item ${item.id}:`, err);
+668:          addSyncLog('error', `[CONSTR_VIOLATION] Sincronização de '${item.id}' quebrou restrição de chave: ${err?.message || errMsg}. Arquivando registro órfão.`);
+672:          addSyncLog('error', `[RLS/AUTH_VIOLATION] Sincronização de '${item.id}' na tabela '${item.table}' falhou de forma permanente por RLS/Permissão (${errCode || errStatus}): ${err?.message || errMsg}. Descartando da fila.`);
+683:            addSyncLog('error', `Falha crítica e definitiva na tabela '${item.table}' (id: ${item.id}): ${err?.message || errMsg}. Descartando da fila.`);
+726:  const [configStatus, setConfigStatus] = useState<{ isValid: boolean; errors: string[] } | null>(null);
+894:    errorMessage?: string,
+922:      error_message: errorMessage,
+947:      error_message: newLog.error_message,
+962:        event.error?.stack || 'Erro na execução interna do web app'
+978:    window.addEventListener('error', handleGlobalError);
+981:      window.removeEventListener('error', handleGlobalError);
+1205:        const { data: qData, error } = await supabase.from(table).select('*');
+1206:        if (error) {
+1207:          throw new Error(`[Supabase Code ${error.code || 'S/C'}] ${error.message}`);
+1243:          throw new Error(parsedJson.error || 'Erro reportado pelo Express no payload');
+1254:      console.error(`[SYNCHRONIZER CRITICAL] Falha irremediável em '${table}' (Direto & Proxy falharam):`, proxyErr.message || proxyErr);
+1255:      addSyncLog('error', `Falha irremediável ao carregar '${table}' (Direto & Proxy falharam): ${proxyErr.message || proxyErr}. Buscando cache offline local...`);
+1264:          console.error(`[SYNCHRONIZER OFFLINE] Falha ao ler cache offline do Dexie para '${table}'`, pe);
+1275:          console.error(`[SYNCHRONIZER OFFLINE] Falha ao decodificar JSON do cache offline do localStorage de '${table}'`);
+1314:              console.error("Erro parsing de realtime theme_settings", e);
+1336:              console.error("Erro parsing de realtime operator_settings", e);
+1595:                        console.error('Error parsing photos from system reply:', e);
+1649:                        console.error("[SYNC_DIAGNOSTIC] Erro ao processar theme_settings:", pe);
+1684:                        console.error("[SYNC_DIAGNOSTIC] Erro ao processar operator_settings:", pe);
+1718:                        console.error("[SYNC_DIAGNOSTIC] Erro ao processar incident_categories:", pe);
+1723:            console.error("[SYNC_DIAGNOSTIC] Falha crítica de sincronização geral:", e);
+2803:          errors={envConfig.errors.length > 0 ? envConfig.errors : ['VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não configurados.']} 

@@ -1,0 +1,10 @@
+{
+  "name": "SICRONIZAÇÃO COM BANCO  Condomínio 09/06/2026 08:58h",
+  "description": "Sistema completo de gestão de condomínio com controle de acesso de moradores e visitantes, agendamento de áreas comuns, mural de avisos e registro de ocorrências.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

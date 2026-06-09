@@ -1,0 +1,830 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, UserPlus, Search, CheckCircle, LogOut, Clock, Calendar, QrCode, ClipboardList, ShieldAlert, Trash2
+} from 'lucide-react';
+import { Visitor, Resident } from '../types';
+import { toUpperText } from '../lib/utils';
+import MercosulPlate from './MercosulPlate';
+import { ProceduralQRCode } from './ProceduralQRCode';
+
+export const getDurationLabel = (val?: string) => {
+  if (!val) return '24 Horas';
+  const mapping: { [key: string]: string } = {
+    '3h': '3 Horas',
+    '6h': '6 Horas',
+    '12h': '12 Horas',
+    '24h': '24 Horas (1 Dia)',
+    '3d': '3 Dias',
+    '5d': '5 Dias',
+    '7d': '7 Dias'
+  };
+  return mapping[val] || val;
+};
+
+interface VisitorsViewProps {
+  visitors: Visitor[];
+  residents: Resident[];
+  onAddVisitor: (visitor: Visitor) => void;
+  onCheckOutVisitor: (id: string) => void;
+  onUpdateVisitorStatus: (id: string, status: 'Pre-Autorizado' | 'Dentro' | 'Saiu' | 'Recusado') => void;
+  onRemoveVisitor: (id: string) => void;
+  currentUser: { id: string; name: string; unit?: string; role: 'Administrador' | 'Morador' | 'Porteiro' | 'MASTER' };
+}
+
+export default function VisitorsView({
+  visitors,
+  residents,
+  onAddVisitor,
+  onCheckOutVisitor,
+  onUpdateVisitorStatus,
+  onRemoveVisitor,
+  currentUser
+}: VisitorsViewProps) {
+  const [activeTab, setActiveTab] = useState<'inside' | 'preauth' | 'history'>('inside');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Form state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [name, setName] = useState('');
+  const [document, setDocument] = useState('');
+  const [phone, setPhone] = useState('');
+  const [type, setType] = useState<'Regular' | 'Prestador' | 'Entrega' | 'Parente'>('Regular');
+  const [unitToVisit, setUnitToVisit] = useState('');
+  const [company, setCompany] = useState('');
+  const [vehiclePlate, setVehiclePlate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isPreAuth, setIsPreAuth] = useState(true);
+  const [validityDuration, setValidityDuration] = useState<string>('');
+
+  // Active QR Code Modal state
+  const [activeQrCodeVisitor, setActiveQrCodeVisitor] = useState<Visitor | null>(null);
+
+  // Countdown timer for expired visitors
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatCountdown = (exitTime: string) => {
+    const exitDate = new Date(exitTime);
+    const expirationDate = new Date(exitDate.getTime() + 2 * 60 * 60 * 1000);
+    const remaining = expirationDate.getTime() - currentTime.getTime();
+
+    if (remaining <= 0) return 'Expirando...';
+
+    const hours = Math.floor(remaining / (1000 * 60 * 60));
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
+  // Filter lists
+  const filteredVisitors = visitors.filter(visitor => {
+    const vName = visitor.name || '';
+    const vDoc = visitor.document || '';
+    const vCompany = visitor.company || '';
+    const vUnit = visitor.unitToVisit || '';
+    
+    const matchesSearch = vName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          vDoc.includes(searchQuery) ||
+                          (vCompany && vCompany.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          vUnit.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (activeTab === 'inside') {
+      return matchesSearch && visitor.status === 'Dentro';
+    } else if (activeTab === 'preauth') {
+      return matchesSearch && visitor.status === 'Pre-Autorizado';
+    } else {
+      return matchesSearch && (visitor.status === 'Saiu' || visitor.status === 'Recusado');
+    }
+  });
+
+  const handleCreateVisitor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !document.trim() || !unitToVisit || !validityDuration) {
+      alert('Por favor, preencha todos os campos obrigatórios (Nome, Documento, Unidade e Tempo de Liberação / Validade).');
+      return;
+    }
+
+    // Attempt to match unit to resident
+    const matchedResident = residents.find(res => res.unit.toLowerCase() === unitToVisit.toLowerCase());
+    
+    if (matchedResident && matchedResident.status === 'Bloqueado') {
+      alert(`ENTRADA NEGADA: O morador responsável (${matchedResident.name}) desta unidade (${unitToVisit}) está BLOQUEADO pelo administrador. Não é permitido registrar visitas.`);
+      return;
+    }
+
+    const hostName = matchedResident ? matchedResident.name : 'Administração / Portaria';
+
+    let durationMs = 24 * 60 * 60 * 1000;
+    if (validityDuration === '3h') durationMs = 3 * 60 * 60 * 1000;
+    else if (validityDuration === '6h') durationMs = 6 * 60 * 60 * 1000;
+    else if (validityDuration === '12h') durationMs = 12 * 60 * 60 * 1000;
+    else if (validityDuration === '24h') durationMs = 24 * 60 * 60 * 1000;
+    else if (validityDuration === '3d') durationMs = 3 * 24 * 60 * 60 * 1000;
+    else if (validityDuration === '5d') durationMs = 5 * 24 * 60 * 60 * 1000;
+    else if (validityDuration === '7d') durationMs = 7 * 24 * 60 * 60 * 1000;
+
+    const expirationTime = new Date(Date.now() + durationMs).toISOString();
+
+    const newVisitor: Visitor = toUpperText({
+      id: crypto.randomUUID(),
+      name,
+      document,
+      phone,
+      type,
+      unitToVisit,
+      residentId: matchedResident?.id,
+      hostName,
+      company: type !== 'Regular' ? company : undefined,
+      vehiclePlate: vehiclePlate ? vehiclePlate.toUpperCase() : undefined,
+      entryTime: isPreAuth ? null : new Date().toISOString(),
+      exitTime: null,
+      status: isPreAuth ? 'Pre-Autorizado' : 'Dentro',
+      exitCode: Math.floor(1000 + Math.random() * 9000).toString(),
+      notes,
+      createdAt: new Date().toISOString(),
+      validityDuration,
+      expirationTime
+    });
+
+    onAddVisitor(newVisitor);
+    
+    // Clear inputs and close
+    setName('');
+    setDocument('');
+    setPhone('');
+    setType('Regular');
+    setUnitToVisit('');
+    setCompany('');
+    setVehiclePlate('');
+    setNotes('');
+    setIsPreAuth(true);
+    setValidityDuration('');
+    setShowAddForm(false);
+  };
+
+  const promotePreAuthToInside = (visitor: Visitor) => {
+    if (confirm(`Tem certeza que deseja liberar a entrada do visitante: ${visitor.name}?`)) {
+        onUpdateVisitorStatus(visitor.id, 'Dentro');
+        alert(`Entrada registrada para o convidado pré-autorizado: ${visitor.name}.`);
+    }
+  };
+
+  const failVisitorAccess = (visitor: Visitor) => {
+    onUpdateVisitorStatus(visitor.id, 'Recusado');
+    alert(`Acesso recusado para: ${visitor.name}.`);
+  };
+
+  return (
+    <div className="space-y-6" id="visitors-management">
+      
+      {/* Search and Action Bar */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-xs">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nome, documento, empresa ou unidade..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+            id="visitors-search-input"
+          />
+        </div>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="w-full md:w-auto bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          id="btn-toggle-add-visitor"
+        >
+          <UserPlus className="w-4 h-4" /> Registrar Novo Acesso
+        </button>
+      </div>
+
+      {/* Visitor Register Form card */}
+      {showAddForm && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6" id="add-visitor-form-container">
+          <div className="border-b border-gray-100 pb-3 mb-5">
+            <h3 className="text-lg font-semibold text-gray-900">Registrar Entrada / Pré-autorização</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Cadastre visitantes esporádicos ou agendamentos dos moradores.</p>
+          </div>
+
+          <form onSubmit={handleCreateVisitor} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              
+              {/* Name */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Nome Completo *</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: Roberto da Silva Santos"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              {/* Document */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Documento (CPF ou RG) *</label>
+                <input
+                  type="text"
+                  required
+                  value={document}
+                  onChange={(e) => setDocument(e.target.value)}
+                  placeholder="Ex: 40.123.456-X"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Telefone Celular</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Ex: (11) 99999-8888"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              
+              {/* Type selector */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Tipo de Acesso</label>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value as any)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+                >
+                  <option value="Regular">Visita Comum</option>
+                  <option value="Prestador">Prestador de Serviço</option>
+                  <option value="Entrega">Entrega / Delivery</option>
+                  <option value="Parente">Parente</option>
+                </select>
+              </div>
+
+              {/* Unit to visit */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Unidade Destino *</label>
+                <select
+                  required
+                  value={unitToVisit}
+                  onChange={(e) => setUnitToVisit(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+                >
+                  <option value="">Selecione a Unidade...</option>
+                  {residents.map((r) => (
+                    <option key={r.id} value={r.unit} className={r.status === 'Bloqueado' ? 'text-red-650 font-bold' : ''}>
+                      {r.unit} ({r.name}){r.status === 'Bloqueado' ? ' [🚫 BLOQUEADO - ACESSO NEGADO]' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Company (if service or delivery) */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Empresa (Se houver)</label>
+                <input
+                  type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="Ex: iFood, Claro, Porto Seguro"
+                  disabled={type === 'Regular'}
+                  className={`w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500 ${
+                    type === 'Regular' ? 'opacity-50' : ''
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Vehicle plate index */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Placa do Veículo (Se houver)</label>
+                <input
+                  type="text"
+                  value={vehiclePlate}
+                  onChange={(e) => setVehiclePlate(e.target.value)}
+                  placeholder="Ex: ABC1D23 ou ABC-1234"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm uppercase focus:outline-none focus:border-sky-500"
+                />
+                {vehiclePlate.trim() && (
+                  <div className="mt-1.5 flex items-center gap-1.5 select-none animate-fadeIn">
+                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Preview Mercosul:</span>
+                    <MercosulPlate plate={vehiclePlate} />
+                  </div>
+                )}
+              </div>
+
+              {/* Validity selector */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Tempo de Liberação / Validade *</label>
+                <select
+                  value={validityDuration}
+                  onChange={(e) => setValidityDuration(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500 font-medium"
+                  required
+                >
+                  <option value="">Selecione a validade...</option>
+                  <option value="3h">3 Horas</option>
+                  <option value="6h">6 Horas</option>
+                  <option value="12h">12 Horas</option>
+                  <option value="24h">24 Horas (1 Dia)</option>
+                  <option value="3d">3 Dias</option>
+                  <option value="5d">5 Dias</option>
+                  <option value="7d">7 Dias</option>
+                </select>
+              </div>
+
+              {/* Pre authorization selector */}
+              <div className="flex items-center justify-between bg-slate-55 p-3.5 rounded-xl border border-dashed border-slate-200 self-end h-[42px]">
+                <span className="text-xs text-gray-700 font-semibold">Agendar Acesso Futuro?</span>
+                <input
+                  type="checkbox"
+                  checked={isPreAuth}
+                  onChange={(e) => setIsPreAuth(e.target.checked)}
+                  className="w-4 h-4 accent-slate-900 rounded"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Observações adicionais</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ex: Trará caixas de ferramentas, autorizado a subir acompanhado, etc."
+                rows={2}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-xs font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="bg-slate-900 hover:bg-black text-white px-5 py-2 rounded-xl text-xs font-semibold"
+              >
+                {isPreAuth ? 'Salvar Pré-Autorização' : 'Liberar Entrada Agora'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Tabs list */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+        <div className="flex border-b border-gray-100 bg-gray-50/50">
+          <button
+            onClick={() => setActiveTab('inside')}
+            className={`flex-1 md:flex-none uppercase text-xs tracking-wider font-semibold py-3 px-6 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
+              activeTab === 'inside'
+                ? 'border-gray-900 text-gray-900 bg-white'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <Clock className="w-4 h-4" /> Presentes ({visitors.filter(v => v.status === 'Dentro').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('preauth')}
+            className={`flex-1 md:flex-none uppercase text-xs tracking-wider font-semibold py-3 px-6 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
+              activeTab === 'preauth'
+                ? 'border-gray-900 text-gray-900 bg-white'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <Calendar className="w-4 h-4" /> Pré-Autorizados ({visitors.filter(v => v.status === 'Pre-Autorizado').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 md:flex-none uppercase text-xs tracking-wider font-semibold py-3 px-6 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
+              activeTab === 'history'
+                ? 'border-gray-900 text-gray-900 bg-white'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" /> Histórico de Saídas
+          </button>
+        </div>
+
+        <div className="p-6">
+          {filteredVisitors.length === 0 ? (
+            <div className="text-center py-16">
+              <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500 font-semibold uppercase">Nenhum registro correspondente</p>
+              <p className="text-xs text-gray-400 mt-1">Gere novos acessos de portaria usando a aba superior de cadastro.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-gray-400 text-xs font-semibold uppercase bg-gray-25/50">
+                    <th className="py-3 px-4">Pessoa / Cadastro</th>
+                    <th className="py-3 px-4">Tipo</th>
+                    <th className="py-3 px-4">Destino da Visita</th>
+                    <th className="py-3 px-4">Veículo/Placa</th>
+                    <th className="py-3 px-4">Horários</th>
+                    <th className="py-3 px-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {filteredVisitors.map((visitor) => (
+                    <tr key={visitor.id} className="hover:bg-gray-50/50">
+                      
+                      {/* Person Details */}
+                      <td className="py-4 px-4">
+                        <div 
+                          className="font-semibold text-gray-905 flex items-center gap-2 cursor-pointer hover:text-sky-700 transition-colors"
+                          onClick={() => setActiveQrCodeVisitor(visitor)}
+                          title="Clique para ver QR Code"
+                        >
+                          {visitor.name}
+                          <span className="hidden">
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-450 font-mono mt-0.5">DOC: {visitor.document}</div>
+                        {visitor.phone && (
+                          <div className="text-xs text-gray-450 mt-0.5">{visitor.phone}</div>
+                        )}
+                        {visitor.notes && (
+                          <div className="text-xs text-slate-500 italic mt-1.5 max-w-[260px] truncate" title={visitor.notes}>
+                            Obs: {visitor.notes}
+                          </div>
+                        )}
+                        {(visitor.autoReleased || (visitor.notes && visitor.notes.includes('Liberação Automática'))) && (
+                          <div className="mt-2">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 bg-red-400/10 text-red-750 text-[10px] font-black font-sans uppercase tracking-wider animate-pulse shadow-sm">
+                              🚨 Liberação Automática do Sistema
+                            </span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Type Badge */}
+                      <td className="py-4 px-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase block w-fit ${
+                          visitor.type === 'Entrega' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                          visitor.type === 'Prestador' ? 'bg-blue-50 text-blue-750 border border-blue-100' : 
+                          visitor.type === 'Parente' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
+                          'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                        }`}>
+                          {visitor.type === 'Regular' ? 'Visitante' : visitor.type === 'Prestador' ? 'Prestador' : visitor.type === 'Parente' ? 'Parente' : 'Entrega'}
+                        </span>
+                        {visitor.company && (
+                          <span className="text-xs text-gray-500 block mt-1 font-medium">{visitor.company}</span>
+                        )}
+                      </td>
+
+                      {/* Unit Destination */}
+                      <td className="py-4 px-4">
+                        <div className="font-semibold text-gray-800 text-xs">{visitor.unitToVisit}</div>
+                        <div className="text-[11px] text-gray-400 mt-0.5 font-medium">Anfitrião: {visitor.hostName}</div>
+                      </td>
+
+                      {/* Vehicle detail */}
+                      <td className="py-4 px-4">
+                        {visitor.vehiclePlate ? (
+                          <div className="flex items-center">
+                            <MercosulPlate plate={visitor.vehiclePlate} />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 font-medium italic">Sem veículo</span>
+                        )}
+                      </td>
+
+                      {/* Timestamps */}
+                      <td className="py-4 px-4 text-xs font-mono text-gray-500 space-y-1">
+                        {activeTab === 'inside' && (
+                          <>
+                            <div className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 soft-pulse"></span>
+                              Entrou: {visitor.entryTime ? new Date(visitor.entryTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </div>
+                            {visitor.expirationTime && (
+                              <div className={`text-[10px] font-sans ${
+                                new Date() > new Date(visitor.expirationTime) ? 'text-rose-600 font-bold' : 'text-gray-450'
+                              }`}>
+                                ⏳ Expira: {new Date(visitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                {new Date() > new Date(visitor.expirationTime) && ' (EXPIRADO)'}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {activeTab === 'preauth' && (
+                          <>
+                            <div className="text-sky-700 font-semibold flex items-center gap-1">
+                              📅 Pré-autorizado
+                            </div>
+                            {visitor.expirationTime && (
+                              <div className={`text-[10px] font-sans ${
+                                new Date() > new Date(visitor.expirationTime) ? 'text-rose-600 font-bold' : 'text-gray-450'
+                              }`}>
+                                📅 Expira: {new Date(visitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                {new Date() > new Date(visitor.expirationTime) && ' (EXPIRADO)'}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {activeTab === 'history' && (
+                          <>
+                            <div className="text-[10px] text-gray-450">E: {visitor.entryTime ? new Date(visitor.entryTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Agendado'}</div>
+                            <div className="text-[10px] text-gray-450">S: {visitor.exitTime ? new Date(visitor.exitTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Rejeitado'}</div>
+                            {visitor.status === 'Saiu' && visitor.exitTime && (
+                              <div className="text-[10px] font-mono text-rose-600 font-bold mt-1">
+                                ⏳ {formatCountdown(visitor.exitTime)}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </td>
+
+                      {/* Action buttons */}
+                      <td className="py-4 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {activeTab === 'inside' && (
+                            <button
+                              onClick={() => onCheckOutVisitor(visitor.id)}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
+                            >
+                              <LogOut className="w-3.5 h-3.5" /> Registrar Saída
+                            </button>
+                          )}
+                          
+                          {activeTab === 'preauth' && (
+                            <>
+                              <button
+                                onClick={() => setActiveQrCodeVisitor(visitor)}
+                                className="bg-sky-50 hover:bg-sky-100 text-sky-600 p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
+                                title="Ver Convite Inteligente"
+                              >
+                                <QrCode className="w-4 h-4" /> Convite
+                              </button>
+                              <button
+                                onClick={() => promotePreAuthToInside(visitor)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold"
+                              >
+                                Liberar entrada
+                              </button>
+                              <button
+                                onClick={() => failVisitorAccess(visitor)}
+                                className="bg-gray-105 hover:bg-rose-50 text-gray-550 hover:text-rose-650 p-1.5 rounded-lg text-xs font-bold"
+                                title="Recusar Acesso"
+                              >
+                                ✕
+                              </button>
+                            </>
+                          )}
+
+                          {activeTab === 'history' && (
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              visitor.status === 'Saiu' ? 'bg-gray-100 text-gray-650' : 'bg-rose-55 text-rose-650'
+                            }`}>
+                              {visitor.status === 'Saiu' ? 'Finalizado' : 'BARRADO / RECUSADO'}
+                            </span>
+                          )}
+
+                          {(currentUser.role === 'Administrador' || currentUser.role === 'MASTER') && (
+                            <button 
+                              onClick={() => { if(confirm('Excluir visitante?')) onRemoveVisitor(visitor.id); }}
+                              className="text-gray-400 hover:text-rose-600 p-1.5 rounded-lg border border-transparent hover:border-rose-100 transition-colors"
+                              title="Excluir Visitante"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* QR Code Invitation Modal overlay */}
+      {activeQrCodeVisitor && (
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl relative select-none">
+            
+            {/* Modal header */}
+            <div className="flex justify-between items-center pb-3 border-b border-gray-105">
+              <span className="text-xs font-bold text-gray-400 block uppercase tracking-wide">Convite Digital Inteligente</span>
+              <button 
+                onClick={() => setActiveQrCodeVisitor(null)}
+                className="text-gray-400 hover:text-black font-bold p-1 text-sm bg-gray-50 rounded-full w-6 h-6 flex items-center justify-center border"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* QR Code details */}
+            <div className="my-6 flex flex-col items-center">
+              <div className="p-4 bg-sky-50 rounded-2xl mb-4 border border-sky-100 relative">
+                {/* Dynamically Generated QR Code using our standard 'qrcode' package */}
+                <div className="w-40 h-40 bg-white border border-gray-150 rounded-xl flex items-center justify-center p-2.5 shadow-sm">
+                  <ProceduralQRCode value={`express-${activeQrCodeVisitor.id}`} size={144} />
+                </div>
+                <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-650 to-sky-600 text-white text-[9px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest shadow-md">
+                  Aprovação Expressa
+                </div>
+              </div>
+
+              <h4 className="text-lg font-bold text-gray-900 mt-2">{activeQrCodeVisitor.name}</h4>
+              <p className="text-xs text-gray-500 font-semibold mb-3">{activeQrCodeVisitor.type === 'Regular' ? 'Visitante Residencial' : 'Prestador de Serviços'}</p>
+
+              {/* Numeric Code Display */}
+              <div className="bg-zinc-100 border border-zinc-200 rounded-xl px-6 py-2 mb-3">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest block mb-0.5">Código de Acesso</span>
+                <span className="text-3xl font-black font-mono text-zinc-900 tracking-[0.2em]">{activeQrCodeVisitor.exitCode}</span>
+              </div>
+
+              {/* Pin Code Removed - QR Only */}
+              
+              <div className="bg-gray-50 p-3 rounded-xl mt-1 w-full text-left space-y-1.5 border border-gray-100">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-450">Unidade Destino:</span>
+                  <span className="font-semibold text-gray-800">{activeQrCodeVisitor.unitToVisit}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-450">Anfitrião:</span>
+                  <span className="font-semibold text-gray-800">{activeQrCodeVisitor.hostName}</span>
+                </div>
+                {activeQrCodeVisitor.vehiclePlate && (
+                  <div className="flex justify-between items-center text-xs border-t border-gray-100/50 pt-2 mt-1">
+                    <span className="text-gray-450">Placa do Veículo:</span>
+                    <MercosulPlate plate={activeQrCodeVisitor.vehiclePlate} />
+                  </div>
+                )}
+                <div className="flex justify-between text-xs border-t border-gray-100 pt-1.5 mt-1.5">
+                  <span className="text-gray-450">Validade do Passe:</span>
+                  <span className="font-semibold text-emerald-700 text-right">
+                    {getDurationLabel(activeQrCodeVisitor.validityDuration)}
+                    {activeQrCodeVisitor.expirationTime && (
+                      <span className="block text-[10px] text-gray-500 font-mono font-medium">
+                        Até {new Date(activeQrCodeVisitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Share and Action buttons */}
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  const createdAt = new Date(activeQrCodeVisitor.createdAt);
+                  const dataVisita = createdAt.toLocaleDateString('pt-BR');
+                  const horarioVisita = createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                  const validade = activeQrCodeVisitor.expirationTime ? new Date(activeQrCodeVisitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Não definido';
+
+                  const message = `🏢 ÁGUAS BELAS 2
+
+CONVITE DE ACESSO
+
+Visitante: ${activeQrCodeVisitor.name}
+Tipo: ${activeQrCodeVisitor.type}
+Data: ${dataVisita}
+Horário: ${horarioVisita}
+
+Unidade: ${activeQrCodeVisitor.unitToVisit}
+Responsável: ${activeQrCodeVisitor.hostName}
+
+Código de Acesso: ${activeQrCodeVisitor.exitCode}
+
+Apresente este código ou o QR Code na portaria para liberação do acesso.
+
+Validade: ${validade}
+
+Obrigado.
+
+QR Code:
+https://sistema.com/convite/express-${activeQrCodeVisitor.id}`;
+
+                  navigator.clipboard.writeText(message);
+                  alert('Convite copiado para a área de transferência!');
+                }}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2.5 rounded-xl transition-colors shrink-0"
+              >
+                Copiar Convite
+              </button>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const createdAt = new Date(activeQrCodeVisitor.createdAt);
+                    const dataVisita = createdAt.toLocaleDateString('pt-BR');
+                    const horarioVisita = createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    const validade = activeQrCodeVisitor.expirationTime ? new Date(activeQrCodeVisitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Não definido';
+
+                    const message = `🏢 ÁGUAS BELAS 2
+
+CONVITE DE ACESSO
+
+Visitante: ${activeQrCodeVisitor.name}
+Tipo: ${activeQrCodeVisitor.type}
+Data: ${dataVisita}
+Horário: ${horarioVisita}
+
+Unidade: ${activeQrCodeVisitor.unitToVisit}
+Responsável: ${activeQrCodeVisitor.hostName}
+
+Código de Acesso: ${activeQrCodeVisitor.exitCode}
+
+Apresente este código ou o QR Code na portaria para liberação do acesso.
+
+Validade: ${validade}
+
+Obrigado.
+
+QR Code:
+https://sistema.com/convite/express-${activeQrCodeVisitor.id}`;
+                    
+                    const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                    window.open(waUrl, '_blank');
+                  }}
+                  className="flex-1 bg-[#25D366] hover:bg-[#1ebd5d] text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  WhatsApp
+                </button>
+                <button
+                  onClick={async () => {
+                     const createdAt = new Date(activeQrCodeVisitor.createdAt);
+                     const dataVisita = createdAt.toLocaleDateString('pt-BR');
+                     const horarioVisita = createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                     const validade = activeQrCodeVisitor.expirationTime ? new Date(activeQrCodeVisitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Não definido';
+
+                     const message = `🏢 ÁGUAS BELAS 2
+
+CONVITE DE ACESSO
+
+Visitante: ${activeQrCodeVisitor.name}
+Tipo: ${activeQrCodeVisitor.type}
+Data: ${dataVisita}
+Horário: ${horarioVisita}
+
+Unidade: ${activeQrCodeVisitor.unitToVisit}
+Responsável: ${activeQrCodeVisitor.hostName}
+
+Código de Acesso: ${activeQrCodeVisitor.exitCode}
+
+Apresente este código ou o QR Code na portaria para liberação do acesso.
+
+Validade: ${validade}
+
+Obrigado.
+
+QR Code:
+https://sistema.com/convite/express-${activeQrCodeVisitor.id}`;
+                     
+                     if (navigator.share) {
+                        try {
+                           await navigator.share({
+                              title: 'Convite de Acesso',
+                              text: message
+                           });
+                        } catch (err) {
+                           console.error('Erro ao compartilhar:', err);
+                        }
+                     } else {
+                        alert('Compartilhamento não suportado neste navegador.');
+                     }
+                  }}
+                  className="flex-1 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  Compartilhar
+                </button>
+              </div>
+
+              <button
+                onClick={() => setActiveQrCodeVisitor(null)}
+                className="w-full bg-gray-100 text-gray-700 text-xs font-semibold py-2 rounded-xl"
+              >
+                Fechar
+              </button>
+            </div>
+
+            
+          </div>
+        </div>
+      )}
+      
+    </div>
+  );
+}

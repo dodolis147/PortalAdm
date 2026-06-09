@@ -1,0 +1,455 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* 
+ * DYNAMIC BRANDING & THEME VARIABLES
+ * Maps the functional UI classes to custom values defined by the Admin.
+ */
+
+:root {
+  --app-bg: #181c24;
+  --app-card-bg: #0d1117;
+  --app-border: #262c38;
+  --app-text: #e2e8f0;
+  --app-text-muted: #8a99ad;
+  --app-accent: #2563eb;
+  --app-accent-hover: #1d4ed8;
+}
+
+/* Document-level base styles */
+body {
+  background-color: var(--app-bg) !important;
+  color: var(--app-text) !important;
+  font-family: var(--font-sans);
+  text-transform: uppercase !important;
+}
+
+input[type="email"] {
+  text-transform: none !important;
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--app-card-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--app-border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--app-accent);
+}
+
+/* Header & Banner Styles */
+header {
+  background-color: var(--app-card-bg) !important;
+  border-bottom: 1px solid var(--app-border) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Outer layout wrapper */
+#app-wrapper, .bg-gray-50\/70, .bg-gray-50 {
+  background-color: var(--app-bg) !important;
+  color: var(--app-text) !important;
+}
+
+/* Card panels standardizing as Bento items */
+.bg-white,
+[id="common-areas-bento"] > div,
+[id="add-booking-form"],
+[id="standard-notice-form"],
+[id="add-incident-form-container"],
+[id="incident-thread-details"] {
+  background-color: var(--app-card-bg) !important;
+  border-color: var(--app-border) !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Dividers & Borders matching the bento line theme */
+.border,
+.border-t,
+.border-b,
+.border-r,
+.border-l,
+.border-gray-100,
+.border-gray-150,
+.border-gray-200,
+.divide-gray-150 {
+  border-color: var(--app-border) !important;
+}
+
+/* Form inputs & Selection controls matching current theme settings */
+input, select, textarea, .bg-gray-50 {
+  background-color: var(--app-bg) !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--app-accent) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--app-accent) !important;
+}
+
+input::placeholder {
+  color: var(--app-text-muted) !important;
+  opacity: 0.6;
+}
+
+/* Navigation button links (tabs) styling */
+#main-navigation {
+  background-color: var(--app-bg) !important;
+  border: 1px solid var(--app-border);
+}
+
+#main-navigation button {
+  color: var(--app-text-muted) !important;
+  transition: all 0.2s ease;
+}
+
+#main-navigation button:hover {
+  background-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+}
+
+/* Active tab highlights with beautiful dynamic accent color and a focus glow */
+#main-navigation button.bg-white {
+  background-color: var(--app-accent) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 15px var(--app-accent) !important;
+}
+
+/* Typography styles optimization */
+h1, h2, h3, h4, h5, h6,
+.text-gray-950, .text-gray-910, .text-gray-901, .text-gray-900, .text-slate-900 {
+  color: var(--app-text) !important;
+}
+
+.text-gray-800, .text-gray-750, .text-gray-700, .text-gray-650, .text-slate-705, .text-slate-700 {
+  color: var(--app-text) !important;
+  opacity: 0.9;
+}
+
+.text-gray-500, .text-gray-650, .text-gray-600, .text-gray-450, .text-gray-400, .text-gray-550 {
+  color: var(--app-text-muted) !important;
+}
+
+/* Tables, lists active hover highlights */
+tr:hover, .hover\:bg-gray-50\/50:hover, .hover\:bg-gray-105\/50:hover {
+  background-color: var(--app-border) !important;
+  opacity: 0.95;
+}
+
+th {
+  background-color: var(--app-card-bg) !important;
+  color: var(--app-text) !important;
+  font-weight: 700 !important;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em !important;
+  border-bottom: 2px solid var(--app-border) !important;
+}
+
+/* Highlighting specific metrics as bento panels */
+#metric-card-visitors {
+  background-color: var(--app-accent) !important;
+  border-color: var(--app-accent) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+#metric-card-visitors * {
+  color: #ffffff !important;
+}
+
+#metric-card-visitors .bg-sky-50 {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+/* Custom interactive glowing indicator states */
+.bg-sky-50 {
+  background-color: var(--app-border) !important;
+  border: 1px solid var(--app-accent) !important;
+  color: var(--app-text) !important;
+}
+
+.print-only {
+  display: none !important;
+}
+
+@media print {
+  /* Set A4 margins and size formatting */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 15mm 15mm 15mm;
+  }
+
+  /* Hide standard screen components, menus, locks, sidebars, buttons */
+  header, 
+  nav, 
+  footer, 
+  #main-navigation, 
+  button, 
+  select, 
+  input, 
+  .no-print,
+  .print-only {
+    display: none !important;
+  }
+
+  /* Hide screen-specific layouts of our active layouts */
+  [class*="no-print"],
+  .fixed.inset-0:not(.print-area-container),
+  main > div:not(#residents-view-component),
+  #residents-view-component > div:not(.print-active-dialog-root) {
+    display: none !important;
+  }
+
+  /* Reset outer container dimensions to fit standard printable body stream */
+  html, body, #root, #app-wrapper, #residents-view-component {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Standard block layouts to avoid flex breaks */
+  .flex, .grid {
+    display: block !important;
+  }
+
+  /* Display printable table properly */
+  .print-area-wrapper {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  #actual-print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 20px !important;
+    page-break-inside: auto;
+  }
+
+  #actual-print-table tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto;
+  }
+
+  #actual-print-table thead {
+    display: table-header-group !important;
+  }
+
+  #actual-print-table tfoot {
+    display: table-footer-group !important;
+  }
+
+  #actual-print-table th {
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    font-weight: bold !important;
+    font-size: 9.5pt !important;
+    text-transform: uppercase !important;
+    padding: 10px 8px !important;
+  }
+
+  #actual-print-table td {
+    border: 1px solid #e2e8f0 !important;
+    padding: 8px !important;
+    font-size: 9pt !important;
+    color: #1e293b !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Plates spacing/borders in black & white printable style */
+  .border-slate-950, .border-slate-400 {
+    border: 1px solid #000000 !important;
+    background-color: #ffffff !important;
+    color: #000050 !important;
+  }
+
+  /* Clear cases forced by uppercase screens */
+  body, h1, h2, h3, h4, th, td, p, span, div, strong, label {
+    text-transform: none !important;
+  }
+}
+
+.bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+  color: #10b981 !important;
+}
+
+.bg-rose-50 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  color: #f87171 !important;
+}
+
+.bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.08) !important;
+  border: 1px solid rgba(245, 158, 11, 0.2) !important;
+  color: #fbbf24 !important;
+}
+
+.bg-purple-50 {
+  background-color: rgba(139, 92, 246, 0.1) !important;
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+  color: #a78bfa !important;
+}
+
+.bg-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+  color: #818cf8 !important;
+}
+
+/* Brand Buttons overrides */
+.bg-slate-900,
+.bg-gray-900,
+.bg-slate-950,
+.bg-amber-55,
+.bg-emerald-55,
+.bg-gray-105 {
+  background-color: var(--app-accent) !important;
+  color: #ffffff !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+}
+
+.bg-slate-900:hover,
+.bg-gray-900:hover,
+.bg-slate-950:hover,
+.bg-emerald-55:hover,
+button[type="submit"],
+#btn-trigger-booking-add,
+#standard-notice-form button,
+#add-booking-form button[type="submit"],
+#response-drafting-block form button[type="submit"] {
+  background-color: var(--app-accent) !important;
+  color: #ffffff !important;
+  opacity: 0.92;
+}
+
+/* Ensure secondary buttons can be distinguished */
+button[type="button"],
+.bg-gray-100 {
+  background-color: var(--app-card-bg) !important;
+  color: var(--app-text) !important;
+  border: 1px solid var(--app-border) !important;
+}
+
+button[type="button"]:hover,
+.bg-gray-100:hover {
+  background-color: var(--app-bg) !important;
+  color: var(--app-text) !important;
+}
+
+/* ----------------------------------------------------
+ * CANCELA LIBERADA - CORES FORTE E PULSANTE
+ * ---------------------------------------------------- */
+@keyframes cancelaGlowPulse {
+  0% {
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.5), 0 0 24px rgba(16, 185, 129, 0.3);
+    border-color: rgba(52, 211, 153, 0.8);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(16, 185, 129, 1), 0 0 55px rgba(52, 211, 153, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.25);
+    border-color: rgba(52, 211, 153, 1);
+    transform: scale(1.03);
+  }
+  100% {
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.5), 0 0 24px rgba(16, 185, 129, 0.3);
+    border-color: rgba(52, 211, 153, 0.8);
+    transform: scale(1);
+  }
+}
+
+.animate-cancela-pulsante {
+  animation: cancelaGlowPulse 1.2s infinite ease-in-out !important;
+  background-color: #047857 !important;
+  background-image: linear-gradient(135deg, #059669 0%, #047857 50%, #064e3b 100%) !important;
+  border-color: #34d399 !important;
+  border-width: 3px !important;
+  color: #ffffff !important;
+}
+
+/* ----------------------------------------------------
+ * BOTAO DE LIBERAR CANCELA - CORES FORTE E PULSANTE
+ * ---------------------------------------------------- */
+@keyframes buttonPulseGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 15px 5px rgba(16, 185, 129, 0.5);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    transform: scale(1);
+  }
+}
+
+.btn-cancela-forte-pulsante {
+  background-color: #10b981 !important;
+  background-image: linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%) !important;
+  border: 1px solid #a7f3d0 !important;
+  color: #ffffff !important;
+  animation: buttonPulseGlow 1.6s infinite ease-in-out !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  font-weight: 900 !important;
+}
+
+.btn-cancela-forte-pulsante:hover {
+  background-image: linear-gradient(135deg, #6ee7b7 0%, #34d399 50%, #059669 100%) !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.9) !important;
+  transform: scale(1.08) !important;
+}
+
+@keyframes softPulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.soft-pulse {
+  animation: softPulse 2s infinite ease-in-out !important;
+}
+
+/* ----------------------------------------------------
+ * PORTARIA EXPRESS - SCANNER LASER SWEEP
+ * ---------------------------------------------------- */
+@keyframes laserSweep {
+  0% { top: 4%; }
+  50% { top: 96%; }
+  100% { top: 4%; }
+}
+
+.animate-scannerLaser {
+  animation: laserSweep 2s infinite ease-in-out !important;
+}
+
+

@@ -1,0 +1,58 @@
+258:    reconnectTimer: ReturnType<typeof setTimeout> | null;
+260:    channel: null,
+261:    reconnectTimer: null
+394:        let error = null;
+400:            syncData = (item.data !== null && typeof item.data === 'object') ? { ...item.data } : item.data;
+469:              console.log(`[SYNC_DIAGNOSTIC] [Mural de Avisos] Payload validado e higienizado enviado ao Supabase:`, JSON.stringify(syncData, null, 2));
+526:          console.log(`│ Payload Final:   `, JSON.stringify(syncData, null, 2));
+576:                  error = null;
+626:                  error = null;
+725:  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+726:  const [configStatus, setConfigStatus] = useState<{ isValid: boolean; errors: string[] } | null>(null);
+873:  const [cancelaReleasePlate, setCancelaReleasePlate] = useState<string | null>(null);
+878:    setCancelaReleasePlate(plate || null);
+883:      setCancelaReleasePlate(null);
+1107:  const [session, setSession] = useState<any>(null);
+1144:  const [activePackageToast, setActivePackageToast] = useState<Encomenda | null>(null);
+1176:    let lastError: any = null;
+1429:        realtimeRef.current.channel = null;
+1751:      const cleanEmail = (r.email && r.email.trim() !== "" && r.email !== "Não cadastrado") ? r.email.trim() : null;
+1854:      email: updatedItem.email || null,
+1858:      avatar_url: updatedItem.avatarUrl || null,
+1971:    } : null;
+2188:        email: oldState.email || null,
+2192:        avatar_url: oldState.avatarUrl || null,
+2275:          email: restoredItem.email || null,
+2279:          avatar_url: restoredItem.avatarUrl || null,
+2283:          deleted_at: null,
+2284:          deleted_by: null,
+2285:          deletion_reason: null
+2378:        addAuditLog('LOGOUT', 'Autenticação', currentUser.id, null, null);
+2396:        addAuditLog('LOGIN', 'Autenticação', 'admin', null, adminUser);
+2399:      addAuditLog('LOGIN_FAILED', 'Autenticação', 'admin', null, null, 'Senha do console master incorreta');
+2414:      addAuditLog('LOGIN_FAILED', 'Autenticação', searchUserId, null, null, 'Nenhum usuário/morador correspondente cadastrado');
+2422:        addAuditLog('LOGIN_FAILED', 'Autenticação', found.id, null, null, 'Tentativa de login em conta bloqueada');
+2442:      addAuditLog('LOGIN', 'Autenticação', found.id, null, user);
+2446:    addAuditLog('LOGIN_FAILED', 'Autenticação', found.id, null, null, 'Senha de morador informada incorretamente');
+2494:        entryTime: null,
+2495:        exitTime: null,
+2504:    const updatedUser = oldVisitor ? { ...oldVisitor, status: 'Saiu' as const, exitTime: new Date().toISOString() } : null;
+2517:    let updatedItem: any = null;
+2550:    const updatedUser = oldResident ? { ...oldResident, avatarUrl } : null;
+2587:    addAuditLog('CREATE', 'Moradores', newResident.id, null, newResident);
+2617:    addAuditLog('CREATE', 'Reservas', newBooking.id, null, newBooking);
+2623:    const updatedItem = oldBooking ? { ...oldBooking, status: 'Cancelado' as const } : null;
+2636:    const updatedItem = oldBooking ? { ...oldBooking, status: 'Confirmado' as const } : null;
+2649:    let updatedItem: any = null;
+2670:    addAuditLog('CREATE', 'Comunicados', newAnn.id, null, newAnn);
+2686:      created_by: currentUser?.id && isValidUUID(currentUser.id) ? currentUser.id : null
+2690:    addAuditLog('CREATE', 'Ocorrências', enrichedInc.id, null, enrichedInc);
+2696:    let updatedItem: any = null;
+2713:    let updatedItem: any = null;
+3314:      <React.Suspense fallback={null}>
+3334:      <React.Suspense fallback={null}>
+3347:        resident={currentUser.role === 'Morador' ? residents.find(r => r.id === currentUser.id) || null : null}
+3355:          onClose={() => setToast(null)}
+3450:                    setActivePackageToast(null);
+3457:                  onClick={() => setActivePackageToast(null)}
+3466:              onClick={() => setActivePackageToast(null)}

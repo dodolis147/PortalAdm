@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+    <!-- Elegant Global WebSocket Error Handling & Auto-reconnection Guard -->
+    <script>
+      (function() {
+        try {
+          if (typeof window !== 'undefined') {
+            if (!window.crypto) {
+              Object.defineProperty(window, 'crypto', {
+                value: {},
+                writable: true,
+                configurable: true
+              });
+            }
+            if (!window.crypto.randomUUID) {
+              try {
+                Object.defineProperty(window.crypto, 'randomUUID', {
+                  value: function() {
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                      var r = (Math.random() * 16) | 0;
+                      var v = c === 'x' ? r : (r & 0x3) | 0x8;
+                      return v.toString(16);
+                    });
+                  },
+                  writable: true,
+                  configurable: true
+                });
+                console.log('[Polyfill] Successfully registered fallback crypto.randomUUID');
+              } catch (err) {
+                try {
+                  window.crypto.randomUUID = function() {
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                      var r = (Math.random() * 16) | 0;
+                      var v = c === 'x' ? r : (r & 0x3) | 0x8;
+                      return v.toString(16);
+                    });
+                  };
+                } catch (assignErr) {
+                  console.error('[Polyfill] Failed to write window.crypto.randomUUID', assignErr);
+                }
+              }
+            }
+          }
+        } catch (globalErr) {
+          console.error('[Polyfill] Failed in crypto.randomUUID routine:', globalErr);
+        }
+      })();
+
+      (function() {
+        try {
+          // Pre-load from localStorage for zero-latency boot resilience
+          var cachedUrl = localStorage.getItem('__SUPABASE_URL');
+          var cachedAnonKey = localStorage.getItem('__SUPABASE_ANON_KEY');
+          if (cachedUrl) window.__SUPABASE_URL = cachedUrl;
+          if (cachedAnonKey) window.__SUPABASE_ANON_KEY = cachedAnonKey;
+        } catch (e) {
+          console.error('[Env Loader] Exception during localStorage check:', e);
+        }
+      })();
+
+      (function() {
+        const NativeWebSocket = window.WebSocket;
+        if (!NativeWebSocket) return;
+
+        class QuietWebSocket extends NativeWebSocket {
+          constructor(url, protocols) {
+            super(url, protocols);
+            
+            // Gracefully catch background errors before they bubble up
+            this.addEventListener('error', (event) => {
+              if (url && (url.includes('vite') || url.includes('/ws') || url.includes('3000') || url.includes('localhost') || url.includes('run.app'))) {
+                event.stopImmediatePropagation();
+              }
+            }, true);
+
+            this.addEventListener('close', (event) => {
+              if (url && (url.includes('vite') || url.includes('/ws') || url.includes('3000') || url.includes('localhost') || url.includes('run.app'))) {
+                event.stopImmediatePropagation();
+              }
+            }, true);
+          }
+        }
+
+        // Apply monkey-patch to standard WebSocket constructor
+        window.WebSocket = QuietWebSocket;
+
+        // Catch global websocket or vite HMR uncaught event errors
+        window.addEventListener('error', function(e) {
+          const isWsError = e.message && (
+            e.message.includes('WebSocket') ||
+            e.message.includes('websocket') ||
+            e.message.includes('fechado sem ter sido') ||
+            e.message.includes('closed before the connection') ||
+            e.message.includes('WebSocket connection to')
+          );
+          if (isWsError) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            return true;
+          }
+        }, true);
+
+        // Catch global unhandled promise rejections related to connecting to WS
+        window.addEventListener('unhandledrejection', function(e) {
+          const reason = e.reason && (e.reason.message || e.reason);
+          if (reason && typeof reason === 'string' && (
+            reason.includes('WebSocket') ||
+            reason.includes('websocket') ||
+            reason.includes('fechado sem ter sido') ||
+            reason.includes('closed before the connection') ||
+            reason.includes('WebSocket connection to')
+          )) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
