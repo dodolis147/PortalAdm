@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { Resident, Visitor, Booking, Incident, Encomenda, CommonArea, ThemeSettings } from '../types';
 import IncidentDetailsModal from './IncidentDetailsModal';
+import ResidentDetailsModal from './ResidentDetailsModal';
+import GuestManager from './GuestManager';
 import { ProceduralQRCode } from './ProceduralQRCode';
 import MercosulPlate from './MercosulPlate';
 import { getDurationLabel } from './VisitorsView';
@@ -37,6 +39,7 @@ interface DashboardViewProps {
   commonAreas: CommonArea[]; // Added this
   onCheckOutVisitor: (id: string) => void;
   onAddVisitor: (visitor: Omit<Visitor, 'id' | 'createdAt' | 'entryTime' | 'exitTime' | 'status'>) => void;
+  onUpdateGuestStatus: (bookingId: string, guestIndex: number, newStatus: 'Entrada Liberada' | 'Presente') => void;
   currentUser: { id: string; name: string; unit?: string; role: 'MASTER' | 'Administrador' | 'Porteiro' | 'Morador' };
   encomendas?: Encomenda[];
   onlineResidentIds?: string[];
@@ -54,6 +57,7 @@ export default function DashboardView({
   commonAreas, // Added this
   onCheckOutVisitor,
   onAddVisitor,
+  onUpdateGuestStatus,
   currentUser,
   encomendas = [],
   onlineResidentIds = [],
@@ -69,24 +73,23 @@ export default function DashboardView({
   const [visitorDocument, setVisitorDocument] = React.useState('');
   const [visitorType, setVisitorType] = React.useState<'Regular' | 'Prestador' | 'Entrega' | 'Parente'>('Regular');
   const [validityDuration, setValidityDuration] = React.useState<string>('');
-  // ...
-const [selectedBookingForDetails, setSelectedBookingForDetails] = React.useState<Booking | null>(null);
-const [selectedIncident, setSelectedIncident] = React.useState<Incident | null>(null);
-const [lprPlate, setLprPlate] = React.useState('');
+  const [expandedBookingId, setExpandedBookingId] = React.useState<string | null>(null);
+  const [selectedIncident, setSelectedIncident] = React.useState<Incident | null>(null);
+  const [lprPlate, setLprPlate] = React.useState('');
   const [activeQrCodeVisitor, setActiveQrCodeVisitor] = useState<Visitor | null>(null);
+  const [showResidentAccessModal, setShowResidentAccessModal] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (showAddForm) setShowAddForm(false);
-        if (selectedBookingForDetails) setSelectedBookingForDetails(null);
         if (selectedIncident) setSelectedIncident(null);
         if (activeQrCodeVisitor) setActiveQrCodeVisitor(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAddForm, selectedBookingForDetails, selectedIncident, activeQrCodeVisitor]);
+  }, [showAddForm, selectedIncident, activeQrCodeVisitor]);
 
   // Auto-authenticate LPR
   React.useEffect(() => {
@@ -246,6 +249,25 @@ const [lprPlate, setLprPlate] = React.useState('');
       )}
       
       {/* Overview Cards */}
+      {isMorador && (
+        <div 
+          className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between gap-6 mb-6 cursor-pointer hover:border-sky-300 transition-colors" 
+          id="my-access-card"
+          onClick={() => setShowResidentAccessModal(true)}
+        >
+            <div>
+              <span className="text-sm font-bold text-gray-900 block mb-1">Meu Cartão de Acesso</span>
+              <p className="text-xs text-gray-500">Apresente este QR Code na portaria para registro de entrada/saída.</p>
+            </div>
+            <ProceduralQRCode value={`express-resident-${currentUser.id}`} size={80} />
+        </div>
+      )}
+      {showResidentAccessModal && residents.find(r => r.id === currentUser.id) && (
+        <ResidentDetailsModal 
+          resident={residents.find(r => r.id === currentUser.id)!} 
+          onClose={() => setShowResidentAccessModal(false)}
+        />
+      )}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Metric CARD 1 */}
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between" id="metric-card-visitors">
@@ -775,39 +797,84 @@ const [lprPlate, setLprPlate] = React.useState('');
                 const area = commonAreas.find(a => a.id === b.areaId);
                 const resident = residents.find(r => r.id === b.residentId);
                 return (
-                  <div key={b.id} className="p-3 bg-gray-50 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setSelectedBookingForDetails(b)}>
-                    {/* Avatar + Resident Info */}
-                    <div className="flex items-center gap-2">
-                      {resident?.avatarUrl ? (
-                         <img src={resident.avatarUrl} alt={b.residentName} className="w-10 h-10 rounded-full object-cover" />
-                      ) : (
-                         <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">
-                           {b.residentName.charAt(0)}
-                         </div>
-                      )}
-                      <div>
-                        <div className="text-xs font-bold text-slate-800">{b.residentName}</div>
-                        <div className="text-[10px] text-slate-500">{b.unit}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 flex flex-col items-end">
-                      <div className="text-xs font-semibold text-gray-900">
-                        {area?.name || b.areaId}
-                      </div>
-                      <div className="text-[10px] font-mono font-bold text-sky-700">
-                        {b.date.split('-').reverse().join('/')} | {b.startTime} - {b.endTime}
-                      </div>
-                      <span className="text-[10px] text-gray-500 block mt-0.5 flex items-center gap-1.5">
-                        <span className={`px-1.5 py-0.5 rounded-md font-bold text-[9px] ${b.status === 'Pendente' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{b.status}</span>
-                        {b.status === 'Pendente' && b.createdAt && (
-                          <PaymentCountdown createdAt={b.createdAt} />
+                  <div key={b.id} className="p-3 bg-gray-50 rounded-xl flex flex-col gap-3 hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      {/* Avatar + Resident Info */}
+                      <div className="flex items-center gap-2">
+                        {resident?.avatarUrl ? (
+                           <img src={resident.avatarUrl} alt={b.residentName} className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                           <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">
+                             {b.residentName.charAt(0)}
+                           </div>
                         )}
-                      </span>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">{b.residentName}</div>
+                          <div className="text-[10px] text-slate-500">{b.unit}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 flex flex-col items-end">
+                        <div className="text-xs font-semibold text-gray-900">
+                          {area?.name || b.areaId}
+                        </div>
+                        <div className="text-[10px] font-mono font-bold text-sky-700">
+                          {b.date.split('-').reverse().join('/')} | {b.startTime} - {b.endTime}
+                        </div>
+                        <span className="text-[10px] text-gray-500 block mt-0.5 flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded-md font-bold text-[9px] ${b.status === 'Pendente' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{b.status}</span>
+                          {b.status === 'Pendente' && b.createdAt && (
+                            <PaymentCountdown createdAt={b.createdAt} />
+                          )}
+                        </span>
+                      </div>
                     </div>
+                    {/* Botão de Presença/Convidados */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExpandedBookingId(expandedBookingId === b.id ? null : b.id); }}
+                      className="w-full bg-blue-100 hover:bg-blue-200 text-blue-700 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
+                    >
+                      {expandedBookingId === b.id ? 'Ocultar Convidados' : 'Presença / Lista de Convidados'}
+                    </button>
+                    {expandedBookingId === b.id && (
+                      <GuestManager booking={b} currentUser={currentUser} onUpdateGuestStatus={onUpdateGuestStatus} />
+                    )}
                   </div>
                 );
               })
+              )}
+
+              {/* Painel Histórico de Reservas (Morador) */}
+              {isMorador && bookings.filter(b => b.date < todayStr && b.unit === myUnit).length > 0 && (
+                <div className="mt-6 pt-6 border-t border-gray-100">
+                  <h4 className="text-sm font-semibold text-gray-950 uppercase tracking-widest text-slate-800 mb-4">Histórico de Reservas</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {bookings.filter(b => b.date < todayStr && b.unit === myUnit).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(b => {
+                      const area = commonAreas.find(a => a.id === b.areaId);
+                      return (
+                        <div key={b.id} className="p-3 bg-gray-50 rounded-xl flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                             <div className="text-[11px] font-bold text-gray-900">
+                               {area?.name || b.areaId}
+                             </div>
+                             <div className="text-[10px] font-mono text-gray-500">
+                               {b.date.split('-').reverse().join('/')}
+                             </div>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setExpandedBookingId(expandedBookingId === b.id ? null : b.id); }}
+                            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
+                          >
+                            {expandedBookingId === b.id ? 'Ocultar Convidados' : 'Ver Lista de Convidados'}
+                          </button>
+                          {expandedBookingId === b.id && (
+                            <GuestManager booking={b} currentUser={currentUser} onUpdateGuestStatus={onUpdateGuestStatus} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
               
               {/* Painel Completo de Agendamentos (Administrador) */}
@@ -825,45 +892,7 @@ const [lprPlate, setLprPlate] = React.useState('');
                 </div>
               )}
               
-              {selectedBookingForDetails && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/65 backdrop-blur-xs select-none animate-fadeIn">
-                  <div className="bg-white rounded-2xl border border-gray-100 max-w-sm w-full shadow-2xl p-6 relative">
-                    <button
-                      onClick={() => setSelectedBookingForDetails(null)}
-                      className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 bg-gray-50 p-1.5 rounded-lg transition-all"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">Detalhes da Reserva</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Espaço</span>
-                        <p className="text-sm font-semibold">{selectedBookingForDetails.areaId === 'salao_festas' ? 'Salão de Festas' : selectedBookingForDetails.areaId === 'churrasqueira' ? 'Churrasqueira' : selectedBookingForDetails.areaId === 'piscina' ? 'Piscina' : 'Quadra'}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Data/Horário</span>
-                        <p className="text-sm font-mono">{selectedBookingForDetails.date.split('-').reverse().join('/')} | {selectedBookingForDetails.startTime} - {selectedBookingForDetails.endTime}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Convidados ({selectedBookingForDetails.guestsCount})</span>
-                        {selectedBookingForDetails.guests && selectedBookingForDetails.guests.length > 0 ? (
-                          <div className="mt-2 bg-sky-50 p-3 rounded-lg border border-sky-100 text-xs text-sky-800">
-                            {selectedBookingForDetails.guests.map(g => g.name || 'Convidado').join(', ')}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-400">Nenhum convidado listado.</p>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setSelectedBookingForDetails(null)}
-                      className="w-full mt-6 bg-slate-900 text-white rounded-lg py-2 text-sm font-semibold"
-                    >
-                      Fechar
-                    </button>
-                  </div>
-                </div>
-              )}
+
             </div>
           </div>
 

@@ -796,7 +796,7 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [pendingSyncQueue]);
 
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'warning' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'warning' | 'error' } | null>(null);
   const [configStatus, setConfigStatus] = useState<{ isValid: boolean; errors: string[] } | null>(null);
 
   // Core local states
@@ -882,6 +882,20 @@ export default function App() {
   const activeIncidents = React.useMemo(() => incidents.filter(i => !i.deleted_at), [incidents]);
   const activeEncomendas = React.useMemo(() => encomendas.filter(e => !e?.deleted_at), [encomendas]);
   const activeAchadosPerdidos = React.useMemo(() => achadosPerdidos.filter(a => !a.deleted_at), [achadosPerdidos]);
+
+  const filteredEncomendas = React.useMemo(() => {
+    if (currentUser.role === 'Morador') {
+      return activeEncomendas.filter(e => e.moradorId === currentUser.id);
+    }
+    return activeEncomendas;
+  }, [activeEncomendas, currentUser.role, currentUser.id]);
+
+  const filteredBookings = React.useMemo(() => {
+    if (currentUser.role === 'Morador') {
+      return activeBookings.filter(b => b.residentId === currentUser.id);
+    }
+    return activeBookings;
+  }, [activeBookings, currentUser.role, currentUser.id]);
 
   // Cancela / Portaria gate trigger state
   const [cancelaReleaseActive, setCancelaReleaseActive] = useState<boolean>(false);
@@ -1228,7 +1242,7 @@ export default function App() {
     setOnlineResidentIds(prev => {
       if (prev.includes(id)) {
         if (currentUser.role === 'Morador' && currentUser.id === id) {
-          alert('Este morador está atualmente conectado e ativo neste terminal.');
+        setToast({ message: 'Este morador está atualmente conectado e ativo neste terminal.', type: 'warning' });
           return prev;
         }
         return prev.filter(rId => rId !== id);
@@ -1645,11 +1659,14 @@ export default function App() {
 
             // 1. Residents
             if (resData) {
-                const newResidents = toCamelCase(resData).map(r => ({
-                  ...r,
-                  qrCodeValue: r.qrCodeValue || crypto.randomUUID(),
-                  createdAt: r.createdAt || new Date().toISOString().split('T')[0]
-                }));
+                const newResidents = toCamelCase(resData).map(r => {
+                  const existing = residents.find(res => res.id === r.id);
+                  return {
+                    ...r,
+                    qrCodeValue: r.qrCodeValue || existing?.qrCodeValue || crypto.randomUUID(),
+                    createdAt: r.createdAt || new Date().toISOString().split('T')[0]
+                  };
+                });
                 setResidents(prev => JSON.stringify(prev) !== JSON.stringify(newResidents) ? newResidents : prev);
             }
 
@@ -1836,7 +1853,8 @@ export default function App() {
         avatar_url: r.avatarUrl,
         role: r.role,
         password: r.password || '1234',
-        biometrics_active: false 
+        biometrics_active: false,
+        qr_code_value: r.qrCodeValue
       };
     });
     
@@ -2540,7 +2558,7 @@ export default function App() {
     const correctPassword = found.password || '1234';
     if (passwordInput === correctPassword) {
       if (found.status === 'Bloqueado') {
-        alert('Este morador está temporariamente bloqueado. Contacte a administração.');
+        setToast({ message: 'Este morador está temporariamente bloqueado. Contacte a administração.', type: 'warning' });
         addAuditLog('LOGIN_FAILED', 'Autenticação', found.id, null, null, 'Tentativa de login em conta bloqueada');
         return false;
       }
@@ -2690,26 +2708,38 @@ export default function App() {
   };
 
   const handleAddResident = (newResident: Resident) => {
-    // 1. Validation: Prevent duplicate emails (if email is set)
+    // 1. Validation: Prevent duplicate units (apartamentos)
+    const newUnit = newResident.unit?.trim().toLowerCase();
+    const unitExists = residents.some(r => r.unit?.trim().toLowerCase() === newUnit && !r.deleted_at);
+    if (unitExists) {
+      setToast({ 
+        message: `Cadastro já existe: O apartamento (${newResident.unit}) já possui um morador cadastrado no sistema. Por favor, verifique os dados ou edite o registro correspondente para continuar.`, 
+        type: 'info' 
+      });
+      return;
+    }
+
+    // 2. Validation: Prevent duplicate emails (if email is set)
     const newEmail = newResident.email?.trim().toLowerCase();
-    if (newEmail && newEmail !== "" && newEmail !== "não cadastrado") {
+    if (newEmail && newEmail !== "" && newEmail !== "não cadastrado" && !newEmail.includes("morador.")) {
       const emailExists = residents.some(r => r.email?.trim().toLowerCase() === newEmail && !r.deleted_at);
       if (emailExists) {
-        setToast({ message: 'Erro: Já existe um morador cadastrado com este e-mail.', type: 'info' });
+        setToast({ 
+          message: `Cadastro já existe: Já existe um morador com o e-mail "${newResident.email}" cadastrado. Por favor, verifique e insira um e-mail diferente para continuar.`, 
+          type: 'info' 
+        });
         return;
       }
     }
 
-    // 2. Validation: Prevent duplicate Name + Unit to avoid copy-pasting entries or double clicks
+    // 3. Validation: Prevent duplicate Names
     const newName = newResident.name?.trim().toLowerCase();
-    const newUnit = newResident.unit?.trim().toLowerCase();
-    const nameUnitExists = residents.some(r => 
-      r.name?.trim().toLowerCase() === newName && 
-      r.unit?.trim().toLowerCase() === newUnit &&
-      !r.deleted_at
-    );
-    if (nameUnitExists) {
-      setToast({ message: 'Erro: Já existe um morador com este nome cadastrado nesta mesma unidade.', type: 'info' });
+    const nameExists = residents.some(r => r.name?.trim().toLowerCase() === newName && !r.deleted_at);
+    if (nameExists) {
+      setToast({ 
+        message: `Cadastro já existe: Já existe um morador cadastrado com o nome "${newResident.name}". Por favor, verifique os dados para evitar duplicidade antes de prosseguir.`, 
+        type: 'info' 
+      });
       return;
     }
 
@@ -2720,9 +2750,58 @@ export default function App() {
   };
 
   const handleUpdateResident = React.useCallback((updatedResident: Resident) => {
+    // 1. Validation: Prevent duplicate units (except for this resident itself)
+    const newUnit = updatedResident.unit?.trim().toLowerCase();
+    const unitExists = residents.some(r => 
+      r.id !== updatedResident.id && 
+      r.unit?.trim().toLowerCase() === newUnit && 
+      !r.deleted_at
+    );
+    if (unitExists) {
+      setToast({ 
+        message: `Edição não permitida: O apartamento (${updatedResident.unit}) já está associado a outro morador cadastrado. Verifique os dados antes de prosseguir.`, 
+        type: 'info' 
+      });
+      return;
+    }
+
+    // 2. Validation: Prevent duplicate emails (except for this resident itself)
+    const newEmail = updatedResident.email?.trim().toLowerCase();
+    if (newEmail && newEmail !== "" && newEmail !== "não cadastrado" && !newEmail.includes("morador.")) {
+      const emailExists = residents.some(r => 
+        r.id !== updatedResident.id && 
+        r.email?.trim().toLowerCase() === newEmail && 
+        !r.deleted_at
+      );
+      if (emailExists) {
+        setToast({ 
+          message: `Edição não permitida: O e-mail "${updatedResident.email}" já está cadastrado para outro morador. Verifique os dados antes de prosseguir.`, 
+          type: 'info' 
+        });
+        return;
+      }
+    }
+
+    // 3. Validation: Prevent duplicate Names (except for this resident itself)
+    const newName = updatedResident.name?.trim().toLowerCase();
+    const nameExists = residents.some(r => 
+      r.id !== updatedResident.id && 
+      r.name?.trim().toLowerCase() === newName && 
+      !r.deleted_at
+    );
+    if (nameExists) {
+      setToast({ 
+        message: `Edição não permitida: Já existe outro morador cadastrado com o nome "${updatedResident.name}". Verifique os dados antes de prosseguir.`, 
+        type: 'info' 
+      });
+      return;
+    }
+
     const oldResident = residents.find(r => r.id === updatedResident.id);
     const updated = residents.map(r => 
-      r.id === updatedResident.id ? updatedResident : r
+      r.id === updatedResident.id 
+        ? { ...updatedResident, qrCodeValue: oldResident?.qrCodeValue || updatedResident.qrCodeValue } 
+        : r
     );
     saveResidents(updated);
     addAuditLog('UPDATE', 'Moradores', updatedResident.id, oldResident, updatedResident);
@@ -2775,13 +2854,13 @@ export default function App() {
     setToast({ message: 'Reserva confirmada com sucesso!', type: 'success' });
   };
 
-  const handleUpdateGuestStatus = (bookingId: string, guestIndex: number) => {
+  const handleUpdateGuestStatus = (bookingId: string, guestIndex: number, newStatus: 'Entrada Liberada' | 'Presença Confirmada' | 'Presente') => {
     const oldBooking = bookings.find(b => b.id === bookingId);
     let updatedItem: any = null;
     const updated = bookings.map(b => {
       if (b.id === bookingId) {
         const newGuests = [...b.guests];
-        newGuests[guestIndex] = { ...newGuests[guestIndex], status: 'Liberado' };
+        newGuests[guestIndex] = { ...newGuests[guestIndex], status: newStatus };
         updatedItem = { ...b, guests: newGuests };
         return updatedItem;
       }
@@ -2791,7 +2870,7 @@ export default function App() {
     if (oldBooking && updatedItem) {
       addAuditLog('UPDATE', 'Reservas', bookingId, oldBooking, updatedItem);
     }
-    setToast({ message: 'Acesso do convidado liberado com sucesso!', type: 'success' });
+    setToast({ message: `Status do convidado atualizado para '${newStatus}' com sucesso!`, type: 'success' });
   };
 
   // 4. Announcements Handlers
@@ -3215,7 +3294,7 @@ export default function App() {
                 } else if (currentUser.role === 'Morador') {
                   setIsProfileModalOpen(true);
                 } else {
-                  alert(`Perfil conectado: ${currentUser.name} (${currentUser.role}). Unidade: ${currentUser.unit || 'Portaria/Painel Gp'}`);
+                  setToast({ message: `Perfil conectado: ${currentUser.name} (${currentUser.role}). Unidade: ${currentUser.unit || 'Portaria/Painel Gp'}`, type: 'info' });
                 }
               }}
               className="flex items-center gap-3 hover:bg-gray-50 p-1 px-2.5 rounded-xl border border-transparent hover:border-gray-200 transition-all cursor-pointer select-none"
@@ -3298,15 +3377,16 @@ export default function App() {
             <DashboardView 
               residents={activeResidents}
               visitors={activeVisitors}
-              bookings={activeBookings}
+              bookings={filteredBookings}
               incidents={activeIncidents}
               commonAreas={activeCommonAreas}
               onCheckOutVisitor={handleCheckOutVisitor}
               currentUser={currentUser}
-              encomendas={activeEncomendas}
+              encomendas={filteredEncomendas}
               onlineResidentIds={onlineResidentIds}
               onToggleResidentOnline={handleToggleResidentOnline}
               onAddVisitor={handleAddVisitorFromResident}
+              onUpdateGuestStatus={handleUpdateGuestStatus}
               onTriggerCancela={triggerCancelaRelease}
               onOpenQRScanner={() => setIsQRScannerOpen(true)}
               themeSettings={themeSettings}
@@ -3345,7 +3425,7 @@ export default function App() {
 
           {activeTab === 'bookings' && (
             <BookingsView 
-              bookings={activeBookings}
+              bookings={filteredBookings}
               residents={activeResidents}
               onAddBooking={handleAddBooking}
               onCancelBooking={handleCancelBooking}
@@ -3386,7 +3466,7 @@ export default function App() {
 
           {activeTab === 'encomendas' && (
             <EncomendasView 
-              encomendas={activeEncomendas}
+              encomendas={filteredEncomendas}
               residents={activeResidents}
               onAddEncomenda={handleAddEncomenda}
               onDeliverEncomenda={handleDeliverEncomenda}

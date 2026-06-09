@@ -3,7 +3,7 @@ import {
   Users, UserPlus, Search, CheckCircle, LogOut, Clock, Calendar, QrCode, ClipboardList, ShieldAlert, Trash2
 } from 'lucide-react';
 import { Visitor, Resident } from '../types';
-import { toUpperText } from '../lib/utils';
+import { toUpperText, generateAccessCode } from '../lib/utils';
 import MercosulPlate from './MercosulPlate';
 import { ProceduralQRCode } from './ProceduralQRCode';
 
@@ -144,7 +144,7 @@ export default function VisitorsView({
       entryTime: isPreAuth ? null : new Date().toISOString(),
       exitTime: null,
       status: isPreAuth ? 'Pre-Autorizado' : 'Dentro',
-      exitCode: Math.floor(1000 + Math.random() * 9000).toString(),
+      exitCode: generateAccessCode(),
       notes,
       createdAt: new Date().toISOString(),
       validityDuration,

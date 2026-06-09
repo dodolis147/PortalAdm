@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Booking, CommonArea, Resident, Guest } from '../types';
 import { toUpperText } from '../lib/utils';
+import GuestManager from './GuestManager';
 
 interface BookingsViewProps {
   bookings: Booking[];
@@ -12,7 +13,7 @@ interface BookingsViewProps {
   onAddBooking: (booking: Booking) => void;
   onCancelBooking: (id: string) => void;
   onConfirmBooking: (id: string) => void;
-  onUpdateGuestStatus: (bookingId: string, guestIndex: number) => void;
+  onUpdateGuestStatus: (bookingId: string, guestIndex: number, newStatus: 'Entrada Liberada' | 'Presença Confirmada' | 'Presente') => void;
   onDeleteBooking: (id: string) => void;
   commonAreas: CommonArea[];
   onSaveCommonArea: (area: CommonArea) => void;
@@ -65,7 +66,6 @@ export default function BookingsView({
   const [showDoubleConfirmation, setShowDoubleConfirmation] = useState(false);
   const [lastBooking, setLastBooking] = useState<Booking | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
-  const [selectedBookingForDetails, setSelectedBookingForDetails] = useState<Booking | null>(null);
 
   // Auto-fill unit if user has one when form opens
   React.useEffect(() => {
@@ -388,6 +388,16 @@ export default function BookingsView({
           </div>
         )}
       
+      <div className="flex justify-end p-2">
+        <button
+          onClick={() => document.getElementById('agenda-concluida')?.scrollIntoView({ behavior: 'smooth' })}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 cursor-pointer flex items-center gap-2"
+        >
+          <Info className="w-4 h-4" />
+          Ver Agenda Concluída
+        </button>
+      </div>
+
       {/* Upper grid panel: Areas summary list */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="common-areas-bento">
         {/* Adicionar nova área (Trigger) se for Administrador ou Porteiro */}
@@ -859,7 +869,7 @@ export default function BookingsView({
       )}
 
       {/* Bookings log listings */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs" id="agenda-concluida">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Agenda Concluída de Uso</h3>
           {(currentUser.role === 'Administrador' || currentUser.role === 'MASTER' || currentUser.role === 'Porteiro') && bookings.some(b => b.date < new Date().toISOString().split('T')[0] && b.status !== 'Cancelado') && (
@@ -902,7 +912,7 @@ export default function BookingsView({
                 {bookings.map((booking) => {
                   const area = getAreaObj(booking.areaId);
                   return (
-                    <tr key={booking.id} className="hover:bg-gray-50/50 cursor-pointer" onClick={() => setSelectedBookingForDetails(booking)}>
+                    <tr key={booking.id} className="hover:bg-gray-50/50 cursor-pointer">
                       
                       {/* Space identifier */}
                       <td className="py-3 px-3">
@@ -954,6 +964,15 @@ export default function BookingsView({
                       {/* Actions */}
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Attendance button */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); }}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1.5 rounded-lg text-xs font-semibold cursor-pointer shrink-0"
+                            title="Gerenciar lista de presença"
+                          >
+                            Presença
+                          </button>
+
                           {booking.status === 'Pendente' && (currentUser.role === 'Administrador' || currentUser.role === 'MASTER' || currentUser.role === 'Porteiro') && (
                             <button
                               onClick={(e) => { e.stopPropagation(); onConfirmBooking(booking.id); }}
@@ -1004,61 +1023,6 @@ export default function BookingsView({
           </div>
         )}
       </div>
-
-      {/* Area Setup / Edit Modal */}
-      {selectedBookingForDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/65 backdrop-blur-xs select-none animate-fadeIn">
-          <div className="bg-white rounded-2xl border border-gray-100 max-w-sm w-full shadow-2xl p-6 relative">
-            <button
-              onClick={() => setSelectedBookingForDetails(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 bg-gray-50 p-1.5 rounded-lg transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Detalhes da Reserva</h3>
-            <div className="space-y-4">
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Espaço/Unidade</span>
-                <p className="text-sm font-semibold">{getAreaObj(selectedBookingForDetails.areaId)?.name} - {selectedBookingForDetails.unit}</p>
-              </div>
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Data/Horário</span>
-                <p className="text-sm font-mono">{selectedBookingForDetails.date.split('-').reverse().join('/')} | {selectedBookingForDetails.startTime} - {selectedBookingForDetails.endTime}</p>
-              </div>
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Convidados ({selectedBookingForDetails.guestsCount})</span>
-                {Array.isArray(selectedBookingForDetails.guests) && selectedBookingForDetails.guests.length > 0 ? (
-                  <div className="mt-2 text-xs space-y-2">
-                    {selectedBookingForDetails.guests.map((guest, index) => (
-                      <div key={index} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
-                        <span className={guest.status === 'Liberado' ? 'text-emerald-700 font-semibold' : 'text-gray-700'}>
-                          {guest.name} {guest.status === 'Liberado' ? '✓' : ''}
-                        </span>
-                        {guest.status === 'Pendente' && (currentUser?.role === 'Porteiro' || currentUser?.role === 'Administrador' || currentUser?.role === 'MASTER') && (
-                          <button
-                            onClick={() => onUpdateGuestStatus(selectedBookingForDetails.id, index)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded text-[10px] font-bold"
-                          >
-                            Liberar
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400">Nenhum convidado listado.</p>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedBookingForDetails(null)}
-              className="w-full mt-6 bg-slate-900 text-white rounded-lg py-2 text-sm font-semibold"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Area Setup / Edit Modal */}
       {showAreaModal && (

@@ -12,7 +12,7 @@ export interface Repository<T> {
 
 const VALID_DB_COLUMN_MAP: Record<string, string[]> = {
   residents: [
-    'id', 'name', 'unit', 'phone', 'email', 'vehicles', 'members', 'status', 'avatar_url', 'role', 'password', 'biometrics_active', 'created_at', 'updated_at', 'created_by', 'active'
+    'id', 'name', 'unit', 'phone', 'email', 'vehicles', 'members', 'status', 'avatar_url', 'role', 'password', 'biometrics_active', 'created_at', 'updated_at', 'created_by', 'active', 'qr_code_value'
   ],
   visitors: [
     'id', 'name', 'document', 'phone', 'type', 'unit_to_visit', 'resident_id', 'host_name', 'company', 'vehicle_plate', 'entry_time', 'exit_time', 'status', 'exit_code', 'notes', 'expiration_time', 'created_at', 'updated_at', 'validity_duration', 'auto_released', 'created_by', 'active'
@@ -192,7 +192,7 @@ export function createRepository<T>(table: string): Repository<T> {
         const { data, error } = await supabase.from(table).upsert(snakeItem).select().single();
         if (error) {
           if (isMissingTableError(error) || isNetworkError(error)) {
-            console.warn(`[SUPABASE_CLIENT_FALLBACK] Table "${table}" does not exist in Supabase. Row saved in local cache only.`, error);
+            console.warn(`[SUPABASE_CLIENT_FALLBACK] Table "${table}" issue during upsert. Row saved in local cache only.`, error);
             return item;
           }
           throw error;

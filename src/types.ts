@@ -76,7 +76,7 @@ export interface CommonArea {
 
 export interface Guest {
   name: string;
-  status: 'Pendente' | 'Liberado';
+  status: 'Pendente' | 'Entrada Liberada' | 'Presença Confirmada' | 'Presente';
 }
 
 export interface Booking {

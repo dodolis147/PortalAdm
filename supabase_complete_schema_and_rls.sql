@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS public.residents (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
   created_by uuid,
-  active boolean DEFAULT true
+  active boolean DEFAULT true,
+  qr_code_value text
 );
 
 -- 1.2 TABELA: visitors (Visitantes / Convidados de Moradores)
@@ -371,6 +372,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='residents' AND column_name='created_by') THEN
     ALTER TABLE public.residents ADD COLUMN created_by uuid;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='residents' AND column_name='qr_code_value') THEN
+    ALTER TABLE public.residents ADD COLUMN qr_code_value text;
   END IF;
 
   -- visitors

@@ -6,7 +6,7 @@ import {
   Lock, Trash2 as Trash2Icon, AlertTriangle, LayoutGrid, List
 } from 'lucide-react';
 import { Resident, Encomenda } from '../types';
-import { toUpperText } from '../lib/utils';
+import { toUpperText, generateAccessCode } from '../lib/utils';
 
 interface EncomendasViewProps {
   encomendas: Encomenda[];
@@ -206,7 +206,8 @@ export default function EncomendasView({
       responsavelRecebimento: receivedByStaff,
       observacoes: observacoes.trim(),
       fotoUrl: finalPhoto,
-      status: 'Pendente'
+      status: 'Pendente',
+      qrCodeValue: generateAccessCode()
     });
 
     onAddEncomenda(newEncomenda);

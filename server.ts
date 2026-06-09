@@ -470,9 +470,109 @@ app.post('/api/save-visitor', async (req, res) => {
   }
 });
 
+function generateAccessCode(length: number = 8): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 app.post('/api/save-resident', async (req, res) => {
   try {
     const resident = req.body;
+
+    // Backend Duplicate Validations
+    if (!Array.isArray(resident)) {
+      const targetId = resident.id;
+      const targetUnit = resident.unit?.trim();
+      const targetName = resident.name?.trim();
+      const targetEmail = resident.email?.trim();
+
+      try {
+        const supabase = getSupabase();
+        if (supabase) {
+          const { data: allRes, error: fetchErr } = await supabase
+            .from('residents')
+            .select('id, name, unit, email, active');
+          
+          if (!fetchErr && allRes) {
+            // Check if another resident has this exact unit
+            const duplicateUnit = allRes.find(r => 
+              r.id !== targetId && 
+              r.active !== false &&
+              r.unit?.trim().toLowerCase() === targetUnit?.toLowerCase()
+            );
+
+            if (duplicateUnit) {
+              return res.status(400).json({ 
+                error: 'Unidade Duplicada', 
+                message: `O apartamento (${targetUnit}) já está cadastrado para outro morador. Por favor, verifique os dados de unidade antes de continuar.` 
+              });
+            }
+
+            // Check if another resident has this exact name or email
+            const duplicateNameOrEmail = allRes.find(r => {
+              if (r.id === targetId || r.active === false) return false;
+              
+              const nameMatch = r.name?.trim().toLowerCase() === targetName?.toLowerCase();
+              
+              const isRealEmail = targetEmail && 
+                targetEmail.toLowerCase() !== 'não cadastrado' && 
+                targetEmail.trim() !== "" &&
+                !targetEmail.toLowerCase().includes('morador.');
+              const rRealEmail = r.email && 
+                r.email.toLowerCase() !== 'não cadastrado' && 
+                r.email.trim() !== "" &&
+                !r.email.toLowerCase().includes('morador.');
+                
+              const emailMatch = isRealEmail && rRealEmail && r.email?.trim().toLowerCase() === targetEmail?.toLowerCase();
+              
+              return nameMatch || emailMatch;
+            });
+
+            if (duplicateNameOrEmail) {
+              const matchedReason = duplicateNameOrEmail.name?.trim().toLowerCase() === targetName?.toLowerCase() ? 'nome' : 'e-mail';
+              const matchedValue = matchedReason === 'nome' ? targetName : targetEmail;
+              return res.status(400).json({
+                error: 'Morador Duplicado',
+                message: `Já existe um morador cadastrado com o mesmo ${matchedReason} (${matchedValue}). Por favor, verifique se o cadastro já existe antes de continuar.`
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Erro na verificação de duplicados do backend:', err);
+      }
+    }
+
+    // Retreive existing QR codes to enforce imutability
+    const idsToQuery = Array.isArray(resident) 
+      ? resident.map((r: any) => r.id).filter(Boolean) 
+      : (resident.id ? [resident.id] : []);
+
+    let existingQrCodes: Record<string, string> = {};
+    if (idsToQuery.length > 0) {
+      try {
+        const supabase = getSupabase();
+        if (supabase) {
+          const { data: dbRes } = await supabase
+            .from('residents')
+            .select('id, qr_code_value')
+            .in('id', idsToQuery);
+          if (dbRes) {
+            dbRes.forEach((row: any) => {
+              if (row.qr_code_value) {
+                existingQrCodes[row.id] = row.qr_code_value;
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao obter qr_codes existentes:', err);
+      }
+    }
     
     // Sanitize resident to only include valid DB fields and ensure valid UUID id
     const sanitize = (r: any) => {
@@ -490,7 +590,8 @@ app.post('/api/save-resident', async (req, res) => {
         members: r.members || [],
         avatar_url: r.avatar_url || r.avatarUrl || null,
         role: r.role || 'Morador',
-        biometrics_active: r.biometrics_active !== undefined ? r.biometrics_active : (r.biometricsActive !== undefined ? r.biometricsActive : false)
+        biometrics_active: r.biometrics_active !== undefined ? r.biometrics_active : (r.biometricsActive !== undefined ? r.biometricsActive : false),
+        qr_code_value: existingQrCodes[cleanId] || r.qr_code_value || r.qrCodeValue || generateAccessCode()
       };
       
       return sanitized;
@@ -531,14 +632,15 @@ app.post('/api/save-resident', async (req, res) => {
       const isMissingColumnError = error?.message && (
         error.message.includes('column') || 
         error.message.includes('password') || 
-        error.message.includes('biometrics_active')
+        error.message.includes('biometrics_active') ||
+        error.message.includes('qr_code_value')
       );
       
       if (isMissingColumnError) {
-        console.log('[CondoAccess Supabase] Removendo campos "password" e "biometrics_active" e tentando salvar novamente por falta de coluna no banco.');
+        console.log('[CondoAccess Supabase] Removendo campos "password", "biometrics_active" e "qr_code_value" e tentando salvar novamente por falta de coluna no banco.');
         
         const cleanSanitized = (item: any) => {
-          const { password, biometrics_active, ...rest } = item;
+          const { password, biometrics_active, qr_code_value, ...rest } = item;
           return rest;
         };
         const fallbackData = Array.isArray(dataToUpsert) 

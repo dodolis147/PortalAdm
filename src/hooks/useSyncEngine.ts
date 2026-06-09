@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from './supabase';
+import { supabase } from '../lib/supabase';
 import { useDexiePersistence } from '../lib/db';
 import { PendingSyncItem } from '../types'; // Need to make sure this exists
 
