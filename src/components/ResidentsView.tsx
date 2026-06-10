@@ -5,7 +5,7 @@ import {
   Package, Bell, LayoutGrid, List, QrCode as QrCodeIcon, Lock, Copy
 } from 'lucide-react';
 import { Resident, Vehicle, Encomenda } from '../types';
-import { toUpperText } from '../lib/utils';
+import { toUpperText, generateAccessCode } from '../lib/utils';
 import MercosulPlate from './MercosulPlate';
 import EditResidentModal from './EditResidentModal';
 import PrintResidentsModal from './PrintResidentsModal';
@@ -164,9 +164,9 @@ export default function ResidentsView({
       vehicles: finalVehicles,
       members,
       avatarUrl: avatarUrl || undefined,
-      password: passwordInput.trim() || '1234',
+      password: passwordInput.trim() || Math.floor(1000 + Math.random() * 9000).toString(),
       role: roleInput,
-      qrCodeValue: crypto.randomUUID()
+      qrCodeValue: generateAccessCode(4)
     });
 
     onAddResident(newRes);
@@ -400,7 +400,7 @@ export default function ResidentsView({
                   type="text"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Se em branco, default é '1234'"
+                  placeholder="Se em branco, gerará código de 4 dígitos"
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-500"
                 />
               </div>
@@ -646,7 +646,7 @@ export default function ResidentsView({
                           <ProceduralQRCode value={resident.qrCodeValue} size={32} />
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-[8px] font-mono text-gray-400 select-all">{resident.qrCodeValue.substring(0, 8)}...</span>
+                          <span className="text-[10px] font-mono font-bold text-gray-500 select-all">{resident.qrCodeValue}</span>
                           <button 
                             onClick={(e) => {
                                 e.stopPropagation();

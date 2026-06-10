@@ -168,22 +168,22 @@ export default function AdminLockScreen({
 
   const renderFormContent = (isCenteredPage: boolean = false) => {
     // Layout-specific styling wrappers
-    let boxClass = "w-full max-w-sm flex flex-col items-center text-center space-y-5";
+    let boxClass = "w-full max-w-[260px] flex flex-col items-center text-center space-y-3";
     let boxStyle: React.CSSProperties = {};
 
     if (model === 1) {
-      boxClass = "w-full max-w-xs bg-zinc-950/75 backdrop-blur-md border border-zinc-850 p-6 rounded-3xl text-center space-y-4 shadow-2xl m-auto";
+      boxClass = "w-full max-w-[260px] bg-zinc-950/75 backdrop-blur-md border border-zinc-850 p-4 rounded-[1.25rem] text-center space-y-3 shadow-2xl m-auto";
     } else if (model === 4) {
-      boxClass = "w-full max-w-xs bg-zinc-900/90 backdrop-blur-md border border-zinc-800 p-6 rounded-3xl text-center space-y-4 shadow-2xl m-auto";
+      boxClass = "w-full max-w-[260px] bg-zinc-900/90 backdrop-blur-md border border-zinc-800 p-4 rounded-[1.25rem] text-center space-y-3 shadow-2xl m-auto";
     } else if (model === 5) {
-      boxClass = "w-full max-w-xs p-4 text-center space-y-4 m-auto"; // flat, ultra minimal
+      boxClass = "w-full max-w-[260px] p-4 text-center space-y-3 m-auto"; // flat, ultra minimal
     } else if (model === 6) {
-      boxClass = "w-full max-w-xs bg-zinc-950 border border-zinc-800 p-6 rounded-3xl text-center space-y-4 shadow-2xl relative overflow-hidden m-auto";
+      boxClass = "w-full max-w-[260px] bg-zinc-950 border border-zinc-800 p-4 rounded-[1.25rem] text-center space-y-3 shadow-2xl relative overflow-hidden m-auto";
     }
 
     return (
       <div 
-        className={`flex-1 flex items-center justify-center p-6 sm:p-12 relative overflow-y-auto h-full`}
+        className={`flex-1 flex items-center justify-center p-4 sm:p-8 relative overflow-y-auto h-full`}
         style={!isCenteredPage ? { backgroundColor: `${custom.secondary_color}ea` } : {}}
       >
         {/* Model 6 accent bar */}
@@ -208,30 +208,15 @@ export default function AdminLockScreen({
                 className="object-contain"
                 style={{
                   height: `${(custom.logo_size || 100) * 0.35}px`,
-                  maxHeight: '100px'
+                  maxHeight: '80px'
                 }}
               />
             </div>
           ) : null}
 
-          {/* System Time Center block - REMOVED */}
-
-
-          {/* Header Title block if Model 4 or 5 */}
-          {(model === 1 || model === 4 || model === 5 || model === 6) && (
-            <div className="space-y-1 select-none">
-              <h3 className="text-md font-extrabold tracking-wide uppercase font-mono" style={{ color: custom.primary_color }}>
-                {custom.condominium_name || appName}
-              </h3>
-              <p className="text-[10px] text-zinc-400 font-mono italic">
-                {custom.slogan || 'Mural Central & Controle de Acesso'}
-              </p>
-            </div>
-          )}
-
           {/* Console Name details */}
           <div 
-            className="border p-3.5 rounded-2xl w-full flex items-center justify-center gap-3 select-none"
+            className="border p-3 rounded-xl w-full flex items-center justify-center gap-2 select-none"
             style={{
               backgroundColor: `${custom.secondary_color}bb`,
               borderColor: `${custom.primary_color}1d`
@@ -311,13 +296,13 @@ export default function AdminLockScreen({
             </div>
 
             {/* Virtual Numeric Touch Keypad */}
-            <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto pt-2 select-none" id="lock-virtual-keypad">
+            <div className="grid grid-cols-3 gap-1.5 max-w-[240px] mx-auto pt-1 select-none" id="lock-virtual-keypad">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
                 <button
                   key={num}
                   type="button"
                   onClick={() => handleKeypadPress(num)}
-                  className="py-2.5 hover:bg-zinc-800/80 active:bg-zinc-800 border rounded-xl text-center font-bold text-xs font-mono transition-all cursor-pointer select-none"
+                  className="py-2 hover:bg-zinc-800/80 active:bg-zinc-800 border rounded-xl text-center font-bold text-xs font-mono transition-all cursor-pointer select-none"
                   style={{
                     backgroundColor: `${custom.secondary_color}dd`,
                     borderColor: `${custom.primary_color}18`,
@@ -330,14 +315,14 @@ export default function AdminLockScreen({
               <button
                 type="button"
                 onClick={handleKeypadClear}
-                className="py-2.5 bg-zinc-950 text-red-400 hover:text-red-300 border border-zinc-900 rounded-xl text-[10px] font-bold font-mono uppercase tracking-tight transition-all cursor-pointer select-none"
+                className="py-2 bg-zinc-950 text-red-400 hover:text-red-300 border border-zinc-900 rounded-xl text-[9px] font-bold font-mono uppercase tracking-tight transition-all cursor-pointer select-none"
               >
                 Limpar
               </button>
               <button
                 type="button"
                 onClick={() => handleKeypadPress('0')}
-                className="py-2.5 hover:bg-zinc-800/80 active:bg-zinc-800 border rounded-xl text-center font-bold text-xs font-mono transition-all cursor-pointer select-none"
+                className="py-2 hover:bg-zinc-800/80 active:bg-zinc-800 border rounded-xl text-center font-bold text-xs font-mono transition-all cursor-pointer select-none"
                 style={{
                   backgroundColor: `${custom.secondary_color}dd`,
                   borderColor: `${custom.primary_color}18`,
@@ -349,7 +334,7 @@ export default function AdminLockScreen({
               <button
                 type="button"
                 onClick={handleKeypadBackspace}
-                className="py-2.5 bg-zinc-950 text-yellow-500 hover:text-yellow-400 border border-zinc-900 rounded-xl text-[10px] font-bold font-mono uppercase tracking-tight transition-all cursor-pointer select-none"
+                className="py-2 bg-zinc-950 text-yellow-500 hover:text-yellow-400 border border-zinc-900 rounded-xl text-[9px] font-bold font-mono uppercase tracking-tight transition-all cursor-pointer select-none"
               >
                 Apagar
               </button>

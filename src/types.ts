@@ -59,6 +59,7 @@ export interface CommonArea {
   capacity: number;
   description: string;
   rules: string;
+  monthlyLimit?: number | null; // Limite de agendamentos por morador por mês
   isExempt?: boolean; // If true, do not calculate or display booking fee/duration costs
   price: number; // Booking fee in R$
   photoUrl?: string; // Real photo of the space (Base64 or URL)

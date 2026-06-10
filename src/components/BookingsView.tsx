@@ -44,6 +44,7 @@ export default function BookingsView({
   const [areaFormCapacity, setAreaFormCapacity] = useState<number>(30);
   const [areaFormDescription, setAreaFormDescription] = useState('');
   const [areaFormRules, setAreaFormRules] = useState('');
+  const [areaFormMonthlyLimit, setAreaFormMonthlyLimit] = useState<number | ''>('');
   const [areaFormPrice, setAreaFormPrice] = useState<number>(0);
   const [areaFormIsExempt, setAreaFormIsExempt] = useState(false);
   const [areaFormPhoto, setAreaFormPhoto] = useState<string>('');
@@ -135,6 +136,7 @@ export default function BookingsView({
     setAreaFormCapacity(30);
     setAreaFormDescription('');
     setAreaFormRules('');
+    setAreaFormMonthlyLimit('');
     setAreaFormPrice(0);
     setAreaFormIsExempt(false);
     setAreaFormPhoto('');
@@ -152,6 +154,7 @@ export default function BookingsView({
     setAreaFormCapacity(area.capacity);
     setAreaFormDescription(area.description);
     setAreaFormRules(area.rules);
+    setAreaFormMonthlyLimit(area.monthlyLimit || '');
     setAreaFormPrice(area.price);
     setAreaFormIsExempt(!!area.isExempt);
     setAreaFormPhoto(area.photoUrl || '');
@@ -178,6 +181,7 @@ export default function BookingsView({
         capacity: areaFormCapacity,
         description: areaFormDescription.trim(),
         rules: areaFormRules.trim(),
+        monthlyLimit: areaFormMonthlyLimit === '' ? null : Number(areaFormMonthlyLimit),
         price: areaFormPrice,
         isExempt: areaFormIsExempt,
         photoUrl: areaFormPhoto || undefined,
@@ -200,6 +204,7 @@ export default function BookingsView({
         capacity: areaFormCapacity,
         description: areaFormDescription.trim(),
         rules: areaFormRules.trim(),
+        monthlyLimit: areaFormMonthlyLimit === '' ? null : Number(areaFormMonthlyLimit),
         price: areaFormPrice,
         isExempt: areaFormIsExempt,
         photoUrl: areaFormPhoto || undefined,
@@ -277,18 +282,20 @@ export default function BookingsView({
       return;
     }
 
-    // 3. Monthly limit validation (1 per month per resident per area)
-    const bookingMonth = date.substring(0, 7);
-    const hasMonthlyBooking = bookings.some(b =>
-      b.unit === unit &&
-      b.areaId === areaId &&
-      b.status !== 'Cancelado' &&
-      b.date.startsWith(bookingMonth)
-    );
+    // 3. Monthly limit validation
+    if (area.monthlyLimit && area.monthlyLimit > 0) {
+      const bookingMonth = date.substring(0, 7);
+      const monthlyBookingsCount = bookings.filter(b =>
+        b.unit === unit &&
+        b.areaId === areaId &&
+        b.status !== 'Cancelado' &&
+        b.date.startsWith(bookingMonth)
+      ).length;
 
-    if (hasMonthlyBooking) {
-      setBookingError(`Limite mensal excedido: Você já realizou um agendamento para o espaço "${area.name}" neste mês. Só é permitido uma reserva por mês para cada área.`);
-      return;
+      if (monthlyBookingsCount >= area.monthlyLimit) {
+        setBookingError(`Limite mensal excedido: A unidade ${unit} já atingiu o limite de ${area.monthlyLimit} agendamento(s) para o espaço "${area.name}" neste mês.`);
+        return;
+      }
     }
 
     // Find Resident
@@ -1105,6 +1112,18 @@ export default function BookingsView({
                   onChange={(e) => setAreaFormDescription(e.target.value)}
                   rows={2}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-500 resize-none font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Limite Mensal por Morador (Vezes)</label>
+                <input
+                  type="number"
+                  placeholder="Ex: 2 (Vazio para sem limite)"
+                  value={areaFormMonthlyLimit === '' ? '' : areaFormMonthlyLimit}
+                  onChange={(e) => setAreaFormMonthlyLimit(e.target.value === '' ? '' : Number(e.target.value))}
+                  min="1"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-500 font-bold"
                 />
               </div>
 

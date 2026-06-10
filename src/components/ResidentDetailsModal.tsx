@@ -71,20 +71,22 @@ export default function ResidentDetailsModal({ resident, onClose }: ResidentDeta
           <p><strong>Cad:</strong> {resident.createdAt ? resident.createdAt.slice(0, 10) : 'N/A'}</p>
         </div>
 
-        <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-xl">
+        <div className="flex flex-col items-center justify-center p-5 bg-[#f5efe9] rounded-2xl">
            <ProceduralQRCode value={resident.qrCodeValue || ''} size={110} />
            
-           <div className="mt-2 p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-center w-full">
-             <p className="text-[10px] text-gray-500 mb-0.5">Código de Acesso</p>
+           <div className="mt-4 p-3 bg-white rounded-xl border border-[#ebd8c8] shadow-sm text-center w-full relative">
+             <p className="text-[9px] uppercase font-bold text-[#8a5a44] tracking-widest mb-1.5 opacity-80">
+               CÓDIGO DE ACESSO
+             </p>
              <div className="flex justify-center items-center gap-2">
-               <p className="text-sm font-bold font-mono tracking-widest" style={{ color: '#1e293b' }}>
+               <p className="text-lg font-black font-mono tracking-[0.25em] text-[#2d3748]">
                  {resident.qrCodeValue || 'N/A'}
                </p>
                <button 
                  onClick={() => {
                    navigator.clipboard.writeText(resident.qrCodeValue || '');
                  }}
-                 className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-slate-800"
+                 className="p-1 hover:bg-[#f5efe9] rounded-md transition-colors text-[#8a5a44] opacity-80 hover:opacity-100"
                  title="Copiar código de acesso"
                >
                  <Copy className="w-4 h-4" />
@@ -93,12 +95,12 @@ export default function ResidentDetailsModal({ resident, onClose }: ResidentDeta
            </div>
         </div>
 
-        <div className="flex gap-2 justify-end mt-4">
-          <button onClick={printIdentification} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-gray-50">
-            <Printer className="w-3.5 h-3.5" /> Impressão
+        <div className="flex gap-3 justify-center mt-6">
+          <button onClick={printIdentification} className="flex flex-1 items-center justify-center gap-2 px-4 py-2 border border-[#fbd38d] bg-white text-[#8a5a44] rounded-lg text-sm font-semibold hover:bg-[#fefcfa] transition-colors shadow-sm">
+            <Printer className="w-4 h-4" /> Impressão
           </button>
-          <button onClick={downloadResidentDetails} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-black">
-            <Download className="w-3.5 h-3.5" /> Download
+          <button onClick={downloadResidentDetails} className="flex flex-1 items-center justify-center gap-2 px-4 py-2 bg-[#ed7b31] text-white rounded-lg text-sm font-semibold hover:bg-[#de6c22] transition-colors shadow-sm">
+            <Download className="w-4 h-4" /> Download
           </button>
         </div>
       </div>

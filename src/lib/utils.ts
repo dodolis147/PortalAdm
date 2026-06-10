@@ -73,7 +73,7 @@ export const isImageUrl = (url?: string): boolean => {
 };
 
 export const generateAccessCode = (length: number = 4): string => {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));

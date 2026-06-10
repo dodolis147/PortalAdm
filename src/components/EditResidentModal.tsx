@@ -55,7 +55,7 @@ export default function EditResidentModal({
       setStatus(resident.status || 'Ativo');
       setAvatarUrl(resident.avatarUrl || '');
       setCoResidentsStr(resident.members ? resident.members.join(', ') : '');
-      setPassword(resident.password || '1234');
+      setPassword(resident.password || Math.floor(1000 + Math.random() * 9000).toString());
       setRole(resident.role || 'Morador');
 
       // Parse unit details
@@ -144,7 +144,7 @@ export default function EditResidentModal({
       vehicles: finalVehicles,
       members,
       avatarUrl: avatarUrl || undefined,
-      password: password.trim() || '1234',
+      password: password.trim() || Math.floor(1000 + Math.random() * 9000).toString(),
       role: role
     };
 

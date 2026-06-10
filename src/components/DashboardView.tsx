@@ -3,6 +3,7 @@ import {
   Users, Calendar, AlertTriangle, Shield, Package, CheckCircle2, Laptop, Signal,
   Palette, Sliders, X, QrCode
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { Resident, Visitor, Booking, Incident, Encomenda, CommonArea, ThemeSettings } from '../types';
 import IncidentDetailsModal from './IncidentDetailsModal';
 import ResidentDetailsModal from './ResidentDetailsModal';
@@ -167,7 +168,7 @@ export default function DashboardView({
       console.log("[DEBUG] My Incidents count:", myIncidents.length);
   }
 
-  const todayStr = '2026-05-27'; // Fixed system time for consistent mock behavior
+  const todayStr = new Date().toLocaleDateString('en-CA'); // Gets YYYY-MM-DD in local time
   
   // Filter today's bookings
   const todayBookings = bookings.filter(b => 
@@ -452,6 +453,35 @@ export default function DashboardView({
           {isMorador && (
             <div className="space-y-6">
 
+              {/* Painel de Acompanhamento de Eventos de Hoje (Morador) */}
+              {todayBookings.length > 0 && (
+                <div className="space-y-4">
+                  {todayBookings.map(booking => {
+                    const area = commonAreas.find(a => a.id === booking.areaId);
+                    return (
+                      <div key={`tracker-${booking.id}`} className="bg-white rounded-2xl border border-indigo-100 shadow-md p-6 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="text-lg font-black text-indigo-950 uppercase tracking-tight">O seu evento de hoje</h3>
+                            <p className="text-sm font-semibold text-indigo-700 mt-0.5">{area?.name || booking.areaId} • {booking.startTime} às {booking.endTime}</p>
+                          </div>
+                          <div className="bg-indigo-50 border border-indigo-100 text-indigo-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2">
+                             <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                             Acompanhamento em Tempo Real
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">Lista de Convidados ({booking.guests?.length || 0})</h4>
+                           <GuestManager booking={booking} currentUser={currentUser} onUpdateGuestStatus={onUpdateGuestStatus} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6" id="my-invites-table">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -547,25 +577,12 @@ export default function DashboardView({
                                  >
                                    WhatsApp
                                  </button>
-                                 {navigator.share && (
-                                   <button
-                                     onClick={async () => {
-                                      const createdAt = new Date(visitor.createdAt);
-                                      const dataVisita = createdAt.toLocaleDateString('pt-BR');
-                                      const horarioVisita = createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                                      const validade = visitor.expirationTime ? new Date(visitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Não definido';
-                                      const message = `🏢 ${themeSettings.appName}\n\nCONVITE DE ACESSO\n\nVisitante: ${visitor.name}\nTipo: ${visitor.type}\nData: ${dataVisita}\nHorário: ${horarioVisita}\n\nUnidade: ${visitor.unitToVisit}\nResponsável: ${visitor.hostName}\n\nCódigo de Acesso: ${visitor.exitCode}\n\nApresente este código ou o QR Code na portaria para liberação do acesso.\n\nValidade: ${validade}\n\nObrigado.\n\nQR Code:\nhttps://sistema.com/convite/express-${visitor.id}`;
-                                      try {
-                                        await navigator.share({ title: 'Convite de Acesso', text: message });
-                                      } catch (err) {
-                                        console.error('Erro ao compartilhar:', err);
-                                      }
-                                     }}
-                                     className="text-[9px] bg-sky-600 text-white px-1.5 py-1 rounded cursor-pointer"
-                                     >
-                                     Compartilhar
-                                   </button>
-                                 )}
+                                  <button
+                                    onClick={() => setActiveQrCodeVisitor(visitor)}
+                                    className="text-[9px] bg-sky-600 font-bold tracking-wider text-white px-2 py-1.5 rounded cursor-pointer"
+                                  >
+                                    PRINT
+                                  </button>
                                </div>
                             </td>
                           </tr>
@@ -900,71 +917,75 @@ export default function DashboardView({
       </div>
       {/* QR Code Invitation Modal overlay */}
       {activeQrCodeVisitor && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl relative select-none">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]" style={{ WebkitFontSmoothing: 'antialiased' }}>
+          <div className="max-w-[320px] w-full relative select-none flex flex-col pt-4">
             
-            {/* Modal header */}
-            <div className="flex justify-between items-center pb-3 border-b border-gray-105">
-              <span className="text-xs font-bold text-gray-400 block uppercase tracking-wide">Convite Digital Inteligente</span>
-              <button 
-                onClick={() => setActiveQrCodeVisitor(null)}
-                className="text-gray-400 hover:text-black font-bold p-1 text-sm bg-gray-50 rounded-full w-6 h-6 flex items-center justify-center border"
-              >
-                ✕
-              </button>
-            </div>
+            {/* Close button outside printable area */}
+            <button 
+              onClick={() => setActiveQrCodeVisitor(null)}
+              className="absolute top-0 right-0 text-gray-400 hover:text-rose-600 font-bold p-1.5 bg-white rounded-full shadow-lg border border-gray-100 z-10 transition-colors transform translate-x-1/3 -translate-y-1/3"
+              title="Fechar"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-            {/* QR Code details */}
-            <div className="my-6 flex flex-col items-center">
-              <div className="p-4 bg-sky-50 rounded-2xl mb-4 border border-sky-100 relative">
-                <div className="w-40 h-40 bg-white border border-gray-150 rounded-xl flex items-center justify-center p-2.5 shadow-sm">
-                  <ProceduralQRCode value={`express-${activeQrCodeVisitor.id}`} size={144} />
-                </div>
-                <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-650 to-sky-600 text-white text-[9px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest shadow-md">
-                  Aprovação Expressa
-                </div>
-              </div>
-
-              <h4 className="text-lg font-bold text-gray-900 mt-2">{activeQrCodeVisitor.name}</h4>
-              <p className="text-xs text-gray-500 font-semibold mb-3">{activeQrCodeVisitor.type === 'Regular' ? 'Visitante Residencial' : 'Prestador de Serviços'}</p>
-
-               {/* Numeric Code Display */}
-              <div className="bg-zinc-100 border border-zinc-200 rounded-xl px-6 py-2 mb-3">
-                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest block mb-0.5">Código de Acesso</span>
-                <span className="text-3xl font-black font-mono text-zinc-900 tracking-[0.2em]">{activeQrCodeVisitor.exitCode}</span>
+            {/* Printable container */}
+            <div id="invite-card-content" className="bg-white rounded-t-[1.5rem] p-5 pb-2 flex flex-col items-center shadow-xl">
+              <div className="w-full pb-3 border-b border-orange-100 flex justify-center items-center">
+                <span className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Convite Digital Inteligente</span>
               </div>
               
-              <div className="bg-gray-50 p-3 rounded-xl mt-1 w-full text-left space-y-1.5 border border-gray-100">
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-450">Unidade Destino:</span>
-                  <span className="font-semibold text-gray-800">{activeQrCodeVisitor.unitToVisit}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-450">Anfitrião:</span>
-                  <span className="font-semibold text-gray-800">{activeQrCodeVisitor.hostName}</span>
-                </div>
-                {activeQrCodeVisitor.vehiclePlate && (
-                  <div className="flex justify-between items-center text-xs border-t border-gray-100/50 pt-2 mt-1">
-                    <span className="text-gray-450">Placa do Veículo:</span>
-                    <MercosulPlate plate={activeQrCodeVisitor.vehiclePlate} />
+              <div className="my-2 flex flex-col items-center w-full">
+                <div className="p-3 bg-orange-50/50 rounded-2xl mb-4 border border-orange-200/50 relative">
+                  <div className="w-36 h-36 bg-white border border-gray-100 rounded-xl flex items-center justify-center p-2 shadow-sm">
+                    <ProceduralQRCode value={`express-${activeQrCodeVisitor.id}`} size={130} />
                   </div>
-                )}
-                <div className="flex justify-between text-xs border-t border-gray-100 pt-1.5 mt-1.5">
-                  <span className="text-gray-450">Validade do Passe:</span>
-                  <span className="font-semibold text-emerald-700 text-right">
-                    {getDurationLabel(activeQrCodeVisitor.validityDuration)}
-                    {activeQrCodeVisitor.expirationTime && (
-                      <span className="block text-[10px] text-gray-500 font-mono font-medium">
-                        Até {new Date(activeQrCodeVisitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                      </span>
-                    )}
-                  </span>
+                  <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-sky-500 to-sky-600 text-white text-[9px] px-3 py-1 rounded-full font-black uppercase tracking-widest shadow-md whitespace-nowrap">
+                    Aprovação Expressa
+                  </div>
+                </div>
+
+                <h4 className="text-base font-bold text-gray-900 mt-2 text-center w-full uppercase">{activeQrCodeVisitor.name}</h4>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 text-center w-full">{activeQrCodeVisitor.type}</p>
+
+                {/* Numeric Code Display */}
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl px-6 py-2 mb-3 w-full">
+                  <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest block mb-0.5 text-center">Código de Acesso</span>
+                  <span className="text-3xl font-black font-mono text-slate-800 tracking-[0.2em] text-center block w-full">{activeQrCodeVisitor.exitCode}</span>
+                </div>
+
+                <div className="bg-orange-50/30 p-3 rounded-xl mt-1 w-full text-left space-y-1.5 border border-orange-100/50">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Unidade Destino:</span>
+                    <span className="font-bold text-gray-800">{activeQrCodeVisitor.unitToVisit}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Anfitrião:</span>
+                    <span className="font-bold text-gray-800">{activeQrCodeVisitor.hostName}</span>
+                  </div>
+                  {activeQrCodeVisitor.vehiclePlate && (
+                    <div className="flex justify-between items-center text-xs border-t border-orange-100/50 pt-2 mt-1">
+                      <span className="text-gray-500 font-medium">Placa:</span>
+                      <MercosulPlate plate={activeQrCodeVisitor.vehiclePlate} />
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs border-t border-orange-100/50 pt-1.5 mt-1.5 align-top">
+                    <span className="text-gray-500 font-medium">Validade:</span>
+                    <span className="font-bold text-emerald-700 text-right flex flex-col items-end">
+                      <span className="uppercase">{getDurationLabel(activeQrCodeVisitor.validityDuration)}</span>
+                      {activeQrCodeVisitor.expirationTime && (
+                        <span className="text-[8px] text-gray-500 font-mono font-bold mt-0.5">
+                          ATÉ {new Date(activeQrCodeVisitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      )}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Share and Action buttons */}
-            <div className="space-y-2">
+            {/* Action buttons (Not printed) */}
+            <div className="p-5 pt-3 w-full bg-white rounded-b-[1.5rem] space-y-2 shadow-xl border-t border-gray-50">
               <button
                 onClick={() => {
                   const createdAt = new Date(activeQrCodeVisitor.createdAt);
@@ -996,11 +1017,11 @@ QR Code:
 https://sistema.com/convite/express-${activeQrCodeVisitor.id}`;
 
                   navigator.clipboard.writeText(message);
-                  alert('Convite copiado para a área de transferência!');
+                  alert('Texto do convite copiado!');
                 }}
-                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2.5 rounded-xl transition-colors shrink-0"
+                className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold py-2.5 rounded-xl transition-colors border border-slate-100"
               >
-                Copiar Convite
+                Copiar Texto
               </button>
               
               <div className="flex gap-2">
@@ -1037,65 +1058,33 @@ https://sistema.com/convite/express-${activeQrCodeVisitor.id}`;
                     const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
                     window.open(waUrl, '_blank');
                   }}
-                  className="flex-1 bg-[#25D366] hover:bg-[#1ebd5d] text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-[#25D366] hover:bg-[#1ebd5d] text-white text-[11px] font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5"
                 >
                   WhatsApp
                 </button>
                 <button
                   onClick={async () => {
-                     const createdAt = new Date(activeQrCodeVisitor.createdAt);
-                     const dataVisita = createdAt.toLocaleDateString('pt-BR');
-                     const horarioVisita = createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                     const validade = activeQrCodeVisitor.expirationTime ? new Date(activeQrCodeVisitor.expirationTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Não definido';
-
-                     const message = `🏢 ${themeSettings.appName}
-
-CONVITE DE ACESSO
-
-Visitante: ${activeQrCodeVisitor.name}
-Tipo: ${activeQrCodeVisitor.type}
-Data: ${dataVisita}
-Horário: ${horarioVisita}
-
-Unidade: ${activeQrCodeVisitor.unitToVisit}
-Responsável: ${activeQrCodeVisitor.hostName}
-
-Código de Acesso: ${activeQrCodeVisitor.exitCode}
-
-Apresente este código ou o QR Code na portaria para liberação do acesso.
-
-Validade: ${validade}
-
-Obrigado.
-
-QR Code:
-https://sistema.com/convite/express-${activeQrCodeVisitor.id}`;
+                     const element = document.getElementById('invite-card-content');
+                     if (!element) return;
                      
-                     if (navigator.share) {
-                        try {
-                           await navigator.share({
-                              title: 'Convite de Acesso',
-                              text: message
-                           });
-                        } catch (err) {
-                           console.error('Erro ao compartilhar:', err);
-                        }
-                     } else {
-                        alert('Compartilhamento não suportado neste navegador.');
+                     try {
+                       const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                       const dataUrl = canvas.toDataURL('image/png');
+                       
+                       const link = document.createElement('a');
+                       link.download = `convite-${activeQrCodeVisitor.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+                       link.href = dataUrl;
+                       link.click();
+                     } catch (err) {
+                       console.error('Erro ao gerar imagem:', err);
+                       alert('Erro ao gerar imagem do convite.');
                      }
                   }}
-                  className="flex-1 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 uppercase tracking-widest"
                 >
-                  Compartilhar
+                  PRINT
                 </button>
               </div>
-
-              <button
-                onClick={() => setActiveQrCodeVisitor(null)}
-                className="w-full bg-gray-100 text-gray-700 text-xs font-semibold py-2 rounded-xl"
-              >
-                Fechar
-              </button>
             </div>
             
           </div>

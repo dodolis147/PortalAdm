@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { toSnakeCase, toCamelCase, parseUsageCount, updateUsageCount } from './lib/utils';
+import { toSnakeCase, toCamelCase, parseUsageCount, updateUsageCount, generateAccessCode } from './lib/utils';
 import { supabase } from './lib/supabase';
 import { getConfig } from './lib/config';
 import { useDexiePersistence, getTableForStore } from './lib/db';
@@ -1257,6 +1257,55 @@ export default function App() {
   const [isMyPackagesOpen, setIsMyPackagesOpen] = useState<boolean>(false);
   const [activePackageToast, setActivePackageToast] = useState<Encomenda | null>(null);
 
+  // Play a sound and show push notification when a package toast is shown for this user
+  useEffect(() => {
+    if (activePackageToast && (currentUser.role === 'Administrador' || currentUser.role === 'MASTER' || currentUser.role === 'Porteiro' || (currentUser.role === 'Morador' && residents.find(r => r.id === currentUser.id)?.unit === `${activePackageToast.torre} - ${activePackageToast.apartamento}`))) {
+       try {
+         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+         const oscillator = audioContext.createOscillator();
+         const gainNode = audioContext.createGain();
+         
+         oscillator.type = 'sine';
+         oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+         oscillator.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.5); // A4
+         
+         gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+         gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+         
+         oscillator.connect(gainNode);
+         gainNode.connect(audioContext.destination);
+         
+         oscillator.start();
+         oscillator.stop(audioContext.currentTime + 0.5);
+       } catch(e) {
+         console.log("Audio not supported or blocked");
+       }
+
+       // Trigger System Push Notification
+       try {
+         if ("Notification" in window) {
+           const notifTitle = "Nova Encomenda Recebida";
+           const notifOptions = {
+             body: `Destino: Unidade ${activePackageToast.torre} - ${activePackageToast.apartamento} (${activePackageToast.moradorNome}).`,
+             icon: '/favicon.ico'
+           };
+           
+           if (Notification.permission === "granted") {
+             new Notification(notifTitle, notifOptions);
+           } else if (Notification.permission !== "denied") {
+             Notification.requestPermission().then(permission => {
+               if (permission === "granted") {
+                 new Notification(notifTitle, notifOptions);
+               }
+             });
+           }
+         }
+       } catch (e) {
+         console.warn("Push Notifications not available", e);
+       }
+    }
+  }, [activePackageToast, currentUser, residents]);
+
   // Synchronize currentUser with online resident list
   useEffect(() => {
     if (currentUser && currentUser.role === 'Morador' && currentUser.id !== 'admin') {
@@ -1521,6 +1570,11 @@ export default function App() {
         if (!record) return;
         const newItem = config.keepSnakeCase ? record : toCamelCase(record, ['deleted_at', 'deleted_by', 'deletion_reason']);
         console.log(`[REALTIME_SYNC_DEBUG] Keys of converted record:`, Object.keys(newItem));
+        
+        if (table === 'encomendas') {
+          setActivePackageToast(newItem as Encomenda);
+        }
+
         setter(prev => {
           const exists = prev.some(item => item.id === newItem.id);
           if (exists) {
@@ -1696,7 +1750,7 @@ export default function App() {
                   const existing = residents.find(res => res.id === r.id);
                   return {
                     ...r,
-                    qrCodeValue: r.qrCodeValue || existing?.qrCodeValue || crypto.randomUUID(),
+                    qrCodeValue: r.qrCodeValue || existing?.qrCodeValue || generateAccessCode(4),
                     createdAt: r.createdAt || new Date().toISOString().split('T')[0]
                   };
                 });
@@ -1938,6 +1992,23 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (residents && residents.length > 0) {
+      const needsMigration = residents.filter(r => !r.qrCodeValue || r.qrCodeValue.length > 5);
+      if (needsMigration.length > 0) {
+        let updatedList = [...residents];
+        needsMigration.forEach(r => {
+          const index = updatedList.findIndex(existing => existing.id === r.id);
+          if (index !== -1) {
+            updatedList[index] = { ...updatedList[index], qrCodeValue: generateAccessCode(4) };
+          }
+        });
+        saveResidents(updatedList);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [residents.length]);
+
   const saveVisitors = async (updated: Visitor[]) => {
     lastWriteTimeRef.current = Date.now();
     setVisitors(updated);
@@ -2048,6 +2119,10 @@ export default function App() {
   };
 
   const handleRemoveVisitor = async (id: string, reason?: string) => {
+    if (currentUser.role === 'Porteiro') {
+      alert('Acesso Negado: Porteiros não têm permissão para excluir visitantes do sistema.');
+      return;
+    }
     const original = visitors.find(v => v.id === id);
     if (!original) return;
     const askReason = reason || window.prompt('Motivo da exclusão do cadastro de visitante:', 'Fim do período de visitas ou correção') || 'Excluído';
@@ -2585,6 +2660,11 @@ export default function App() {
         setCurrentUser(adminUser);
         handleSetPanelLockedState(false);
         addAuditLog('LOGIN', 'Autenticação', 'admin', null, adminUser);
+        
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+           Notification.requestPermission().catch(() => {});
+        }
+
         return true;
       }
       addAuditLog('LOGIN_FAILED', 'Autenticação', 'admin', null, null, 'Senha do console master incorreta');
@@ -2631,6 +2711,12 @@ export default function App() {
       
       handleSetPanelLockedState(false);
       addAuditLog('LOGIN', 'Autenticação', found.id, null, user);
+
+      // Request Push Notification permission upon login action to ensure browser accepts the user gesture
+      if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+         Notification.requestPermission().catch(() => {});
+      }
+
       return true;
     }
 
@@ -2745,6 +2831,44 @@ export default function App() {
     setToast({ message: `Status do visitante atualizado para "${status}" com sucesso!`, type: 'success' });
   };
 
+  // Monitorar tempo de permanência dos visitantes
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const now = new Date();
+      let hasUpdates = false;
+
+      const updatedVisitors = visitors.map(v => {
+        if (v.status === 'Dentro' && v.expirationTime) {
+          if (now > new Date(v.expirationTime)) {
+            hasUpdates = true;
+
+            const updatedUser = {
+              ...v,
+              status: 'Saiu' as const,
+              exitTime: now.toISOString(),
+              autoReleased: true,
+              notes: v.notes ? `${v.notes} (Baixa Automática)` : 'Baixa Automática'
+            };
+            
+            if (currentUser.role === 'Porteiro' || currentUser.role === 'Administrador' || currentUser.role === 'MASTER' || (currentUser.role === 'Morador' && currentUser.unit === v.unitToVisit)) {
+               setToast({ message: `Tempo do visitante esgotou, baixa de Saida automatica (${v.name})`, type: 'warning' });
+            }
+
+            addAuditLog('UPDATE', 'Visitantes', v.id, v, updatedUser);
+            return updatedUser;
+          }
+        }
+        return v;
+      });
+
+      if (hasUpdates) {
+        saveVisitors(updatedVisitors);
+      }
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [visitors, currentUser, setToast]);
+
   const handleUpdateResidentAvatar = (id: string, avatarUrl: string) => {
     const oldResident = residents.find(r => r.id === id);
     const updatedUser = oldResident ? { ...oldResident, avatarUrl } : null;
@@ -2759,16 +2883,8 @@ export default function App() {
   };
 
   const handleAddResident = (newResident: Resident) => {
-    // 1. Validation: Prevent duplicate units (apartamentos)
-    const newUnit = newResident.unit?.trim().toLowerCase();
-    const unitExists = residents.some(r => r.unit?.trim().toLowerCase() === newUnit && !r.deleted_at);
-    if (unitExists) {
-      setToast({ 
-        message: `Cadastro já existe: O apartamento (${newResident.unit}) já possui um morador cadastrado no sistema. Por favor, verifique os dados ou edite o registro correspondente para continuar.`, 
-        type: 'info' 
-      });
-      return;
-    }
+    // 1. Removed validation to allow multiple residents in the same unit
+    // (A unit can have multiple residents)
 
     // 2. Validation: Prevent duplicate emails (if email is set)
     const newEmail = newResident.email?.trim().toLowerCase();
@@ -2801,20 +2917,8 @@ export default function App() {
   };
 
   const handleUpdateResident = React.useCallback((updatedResident: Resident) => {
-    // 1. Validation: Prevent duplicate units (except for this resident itself)
-    const newUnit = updatedResident.unit?.trim().toLowerCase();
-    const unitExists = residents.some(r => 
-      r.id !== updatedResident.id && 
-      r.unit?.trim().toLowerCase() === newUnit && 
-      !r.deleted_at
-    );
-    if (unitExists) {
-      setToast({ 
-        message: `Edição não permitida: O apartamento (${updatedResident.unit}) já está associado a outro morador cadastrado. Verifique os dados antes de prosseguir.`, 
-        type: 'info' 
-      });
-      return;
-    }
+    // 1. Removed validation to allow multiple residents in the same unit
+    // (A unit can have multiple residents)
 
     // 2. Validation: Prevent duplicate emails (except for this resident itself)
     const newEmail = updatedResident.email?.trim().toLowerCase();
@@ -3158,6 +3262,22 @@ export default function App() {
 
             {/* Mobile Actions Header Gear */}
             <div className="flex lg:hidden items-center gap-2">
+              <button 
+                onClick={() => setIsProfileModalOpen(true)}
+                className="w-8 h-8 rounded-full overflow-hidden border border-zinc-200 shadow-sm shrink-0 flex items-center justify-center bg-slate-900 text-white font-mono font-black text-[11px] uppercase tracking-tight"
+                title="Seu Perfil Conectado"
+              >
+                {(currentUser.role === 'Morador' ? residents.find(r => r.id === currentUser.id)?.avatarUrl : operatorAvatarUrl) ? (
+                  <img 
+                    src={currentUser.role === 'Morador' ? residents.find(r => r.id === currentUser.id)?.avatarUrl : operatorAvatarUrl} 
+                    alt={currentUser.name} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  currentUser.name.split(' ').filter(n => !n.toLowerCase().startsWith('op.')).map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'US'
+                )}
+              </button>
               {currentUser.role !== 'Morador' && (
                 <button
                   onClick={() => setIsQRScannerOpen(true)}
@@ -3718,7 +3838,7 @@ export default function App() {
 
       {/* Real-Time Package Insertion Toast Alert */}
       <AnimatePresence>
-        {activePackageToast && (
+        {activePackageToast && (currentUser.role === 'Administrador' || currentUser.role === 'MASTER' || currentUser.role === 'Porteiro' || (currentUser.role === 'Morador' && residents.find(r => r.id === currentUser.id)?.unit === `${activePackageToast.torre} - ${activePackageToast.apartamento}`)) && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 50 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
