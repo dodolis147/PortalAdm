@@ -895,14 +895,14 @@ https://sistema.com/convite/express-${activeQrCodeVisitor.id}`;
                 </button>
                 <button
                   onClick={async () => {
-                     const element = document.getElementById('invite-card-content');
+                     const element = window.document.getElementById('invite-card-content');
                      if (!element) return;
                      
                      try {
                        const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
                        const dataUrl = canvas.toDataURL('image/png');
                        
-                       const link = document.createElement('a');
+                       const link = window.document.createElement('a');
                        link.download = `convite-${activeQrCodeVisitor.name.replace(/\s+/g, '-').toLowerCase()}.png`;
                        link.href = dataUrl;
                        link.click();

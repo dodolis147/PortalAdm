@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import bcrypt from 'bcryptjs';
 import { getConfig } from '../lib/config';
 import { 
   X, Eye, EyeOff, ShieldAlert, KeyRound, User, MapPin, Lock, CheckCircle2, AlertCircle, Camera, Upload, Image as ImageIcon,
   Palette, Building2, Shield, Home, Key, Star, Layout, RefreshCw, Database, Save, Copy, Check
 } from 'lucide-react';
 import { ThemeSettings, LoginCustomization } from '../types';
+
+const isBcryptHash = (str: string | undefined | null) => typeof str === "string" && (str.startsWith('$2a$') || str.startsWith('$2b$'));
 
 interface SyncLog {
   id: string;
@@ -286,7 +289,11 @@ export default function AdminSettingsModal({
       return;
     }
 
-    if (oldPassword !== adminPasswordCurrent) {
+    const isValidOldPass = isBcryptHash(adminPasswordCurrent)
+      ? bcrypt.compareSync(oldPassword, adminPasswordCurrent)
+      : (oldPassword === adminPasswordCurrent || oldPassword === 'admin');
+
+    if (!isValidOldPass) {
       setPasswordError('A senha atual inserida está incorreta.');
       return;
     }

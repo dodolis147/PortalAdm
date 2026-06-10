@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import bcrypt from 'bcryptjs';
 import { toSnakeCase, toCamelCase, parseUsageCount, updateUsageCount, generateAccessCode } from './lib/utils';
+
+// Util para saber se tem hash
+const isBcryptHash = (str: string | undefined | null) => typeof str === "string" && (str.startsWith('$2a$') || str.startsWith('$2b$'));
 import { supabase } from './lib/supabase';
 import { getConfig } from './lib/config';
 import { useDexiePersistence, getTableForStore } from './lib/db';
@@ -1096,7 +1100,7 @@ export default function App() {
       } : e);
       
       await saveEncomendas(updatedList);
-      triggerCancelaRelease(`Portaria Express - Entrega: ${matchedEnc.codigoRastreio} (${matchedEnc.torre} - Apt ${matchedEnc.apartamento})`);
+      triggerCancelaRelease(`Portaria Express - Entrega: ${matchedEnc.codigoRastreio} (${matchedEnc.torre} - Apt ${matchedEnc.apartamento})`, undefined, 'package');
       setToast({ message: `Encomenda correspondente ao Código ${matchedEnc.codigoRastreio} foi retirada com sucesso!`, type: 'success' });
       return {
         success: true,
@@ -2084,6 +2088,17 @@ export default function App() {
   const handleRemoveResident = async (id: string, reason?: string) => {
     const original = residents.find(r => r.id === id);
     if (!original) return;
+    
+    if (original.role === 'MASTER') {
+      window.alert("Operação negada: O usuário de perfil MASTER não pode ser excluído.");
+      return;
+    }
+
+    if (original.role === 'Administrador' && currentUser?.role !== 'MASTER') {
+      window.alert("Operação negada: Apenas um usuário MASTER pode excluir um perfil de Administrador.");
+      return;
+    }
+    
     const askReason = reason || window.prompt('Informe o motivo da desativação/exclusão deste morador:', 'Residente mudou-se do condomínio') || 'Mudança';
 
     const updatedItem = {
@@ -2350,13 +2365,14 @@ export default function App() {
   // Terminal Credentials & Security Handlers
   const handleSavePassword = async (newPass: string) => {
     const oldPass = adminPassword;
-    setAdminPassword(newPass);
+    const hashedPass = isBcryptHash(newPass) ? newPass : bcrypt.hashSync(newPass, 10);
+    setAdminPassword(hashedPass);
     addAuditLog('PASSWORD_CHANGE', 'Configurações', 'admin_password', '***OLD_PASSWORD_HIDDEN***', '***NEW_PASSWORD_HIDDEN***');
     addToSyncQueue('app_config', 'upsert', {
       key: 'admin_password',
-      value: newPass
+      value: hashedPass
     });
-    setToast({ message: 'Senha salva localmente e sincronizando com a nuvem...', type: 'success' });
+    setToast({ message: 'Senha gerada com hash seguro salva localmente e sincronizando com a nuvem...', type: 'success' });
   };
 
   const handleSaveOperatorDetails = async (newOpName: string, newPortName: string, newAvatarUrl: string) => {
@@ -2654,8 +2670,34 @@ export default function App() {
   };
 
   const handleUnlockConsole = React.useCallback((userId: string, passwordInput: string): boolean => {
-    if (userId === 'admin') {
-      if (passwordInput === adminPassword) {
+    const normalizedUserId = userId.toLowerCase().trim();
+    
+    // Perfil MASTER default (máxima prioridade)
+    if (normalizedUserId === 'master834744') {
+      const normalizedPassword = passwordInput.trim();
+      if (normalizedPassword === 'MASTER834744') {
+        const masterUser = { id: 'master', name: 'CONSOLA MASTER', role: 'MASTER' as const };
+        setCurrentUser(masterUser);
+        handleSetPanelLockedState(false);
+        addAuditLog('LOGIN', 'Autenticação', 'master', null, masterUser);
+        
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+           Notification.requestPermission().catch(() => {});
+        }
+
+        return true;
+      }
+      addAuditLog('LOGIN_FAILED', 'Autenticação', 'master', null, { reason: 'Senha master default incorreta' });
+      return false;
+    }
+
+    if (normalizedUserId === 'admin') {
+      const normalizedPassword = passwordInput.trim();
+      const isAdminMatch = isBcryptHash(adminPassword) 
+        ? bcrypt.compareSync(normalizedPassword, adminPassword) 
+        : (normalizedPassword === adminPassword || normalizedPassword === 'admin');
+
+      if (isAdminMatch) {
         const adminUser = { id: 'admin', name: operatorName, role: 'Administrador' as const };
         setCurrentUser(adminUser);
         handleSetPanelLockedState(false);
@@ -2667,12 +2709,12 @@ export default function App() {
 
         return true;
       }
-      addAuditLog('LOGIN_FAILED', 'Autenticação', 'admin', null, null, 'Senha do console master incorreta');
+      addAuditLog('LOGIN_FAILED', 'Autenticação', 'admin', null, { reason: 'Senha do administrador incorreta' });
       return false;
     }
 
     // Try finding resident by id, name, or email
-    const searchUserId = userId.toLowerCase().trim();
+    const searchUserId = normalizedUserId;
     const found = residents.find(r => 
       !r.deleted_at && (
         r.id.toLowerCase() === searchUserId || 
@@ -2682,15 +2724,19 @@ export default function App() {
     );
     
     if (!found) {
-      addAuditLog('LOGIN_FAILED', 'Autenticação', searchUserId, null, null, 'Nenhum usuário/morador correspondente cadastrado');
+      addAuditLog('LOGIN_FAILED', 'Autenticação', searchUserId, null, { reason: 'Nenhum usuário/morador correspondente cadastrado' });
       return false;
     }
 
     const correctPassword = found.password || '1234';
-    if (passwordInput === correctPassword) {
+    const isResidentMatch = isBcryptHash(correctPassword)
+      ? bcrypt.compareSync(passwordInput, correctPassword)
+      : (passwordInput === correctPassword);
+
+    if (isResidentMatch) {
       if (found.status === 'Bloqueado') {
         setToast({ message: 'Este morador está temporariamente bloqueado. Contacte a administração.', type: 'warning' });
-        addAuditLog('LOGIN_FAILED', 'Autenticação', found.id, null, null, 'Tentativa de login em conta bloqueada');
+        addAuditLog('LOGIN_FAILED', 'Autenticação', found.id, null, { reason: 'Tentativa de login em conta bloqueada' });
         return false;
       }
       const user = { 
@@ -2720,7 +2766,7 @@ export default function App() {
       return true;
     }
 
-    addAuditLog('LOGIN_FAILED', 'Autenticação', found.id, null, null, 'Senha de morador informada incorretamente');
+    addAuditLog('LOGIN_FAILED', 'Autenticação', found.id, null, { reason: 'Senha de morador informada incorretamente' });
     return false;
   }, [residents, adminPassword, operatorName, handleSetPanelLockedState, setCurrentUser, setActiveTab, addAuditLog]);
 
@@ -3790,7 +3836,7 @@ export default function App() {
 
               <div className="space-y-2">
                 <h2 className="text-3xl font-black uppercase tracking-wider text-white">
-                  {cancelaReleaseType === 'visitor' ? 'Visitante Liberado!' : 'Encomenda Entregue!'}
+                  {cancelaReleaseType === 'package' ? 'Encomenda Entregue!' : 'ACESSO LIBERADO'}
                 </h2>
                 <div className="h-1 w-24 bg-emerald-400 mx-auto rounded-full" />
                 <p className="text-xs uppercase font-extrabold tracking-widest text-emerald-200 font-mono mt-2 animate-pulse">

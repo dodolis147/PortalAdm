@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
+import bcrypt from 'bcryptjs';
+
+// Função helper local
+const isBcryptHash = (str: string | undefined | null) => typeof str === "string" && (str.startsWith('$2a$') || str.startsWith('$2b$'));
 import { 
   Users, Search, UserPlus, Phone, Mail, Car, CreditCard, CheckCircle2, UserCheck, Trash2, Camera, Upload, Image as ImageIcon, Edit, KeyRound, Plus,
   Package, Bell, LayoutGrid, List, QrCode as QrCodeIcon, Lock, Copy
@@ -154,6 +158,9 @@ export default function ResidentsView({
       });
     }
 
+    const rawPassword = passwordInput.trim() || Math.floor(1000 + Math.random() * 9000).toString();
+    const hashedPassword = isBcryptHash(rawPassword) ? rawPassword : bcrypt.hashSync(rawPassword, 10);
+
     const newRes: Resident = toUpperText({
       id: crypto.randomUUID(),
       name: name.trim(),
@@ -164,7 +171,7 @@ export default function ResidentsView({
       vehicles: finalVehicles,
       members,
       avatarUrl: avatarUrl || undefined,
-      password: passwordInput.trim() || Math.floor(1000 + Math.random() * 9000).toString(),
+      password: hashedPassword,
       role: roleInput,
       qrCodeValue: generateAccessCode(4)
     });
@@ -415,8 +422,12 @@ export default function ResidentsView({
                 >
                   <option value="Morador" className="font-normal text-slate-800">Morador (Consultas da unidade, agendamentos e encomendas)</option>
                   <option value="Porteiro" className="font-normal text-slate-800">Porteiro / Porteira (Controle de visitas, encomendas, sem configurações)</option>
-                  <option value="Administrador" className="font-normal text-slate-800">Administrador / Síndico (Controle total do sistema)</option>
-                  <option value="MASTER" className="font-black text-rose-600 bg-rose-50">👑 MASTER (Permissão Total de Tudo / Acesso Absoluto)</option>
+                  {(currentUser?.role === 'Administrador' || currentUser?.role === 'MASTER') && (
+                    <option value="Administrador" className="font-normal text-slate-800">Administrador / Síndico (Controle total do sistema)</option>
+                  )}
+                  {currentUser?.role === 'MASTER' && (
+                    <option value="MASTER" className="font-black text-rose-600 bg-rose-50">👑 MASTER (Permissão Total de Tudo / Acesso Absoluto)</option>
+                  )}
                 </select>
               </div>
             </div>
@@ -798,7 +809,7 @@ export default function ResidentsView({
                           {resident.role || 'Morador'}
                         </span>
                         <span className="font-mono text-[10px] bg-gray-50 border border-gray-200 px-2 py-0.5 rounded text-gray-700 select-all truncate" title="Senha de login">
-                          🔑 {resident.password || '1234'}
+                          🔑 {resident.password?.startsWith('$2') ? '••••••••' : (resident.password || '1234')}
                         </span>
                       </div>
                     </div>
@@ -948,6 +959,7 @@ export default function ResidentsView({
         resident={editingResident}
         onSave={onUpdateResident}
         towerNames={towerNames}
+        currentUser={currentUser}
       />
 
       <PrintResidentsModal

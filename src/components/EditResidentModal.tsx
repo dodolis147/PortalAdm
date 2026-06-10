@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import bcrypt from 'bcryptjs';
+
+const isBcryptHash = (str: string | undefined | null) => typeof str === "string" && (str.startsWith('$2a$') || str.startsWith('$2b$'));
+
 import { 
   X, Camera, Upload, Image as ImageIcon, Car, CheckCircle2, AlertOctagon, UserX, UserCheck, ShieldAlert,
   Trash2, Plus, Edit2
@@ -12,6 +16,7 @@ interface EditResidentModalProps {
   resident: Resident | null;
   onSave: (updatedResident: Resident) => void;
   towerNames?: string[];
+  currentUser?: { id: string; name: string; unit?: string; role: 'MASTER' | 'Administrador' | 'Porteiro' | 'Morador' };
 }
 
 const PRESET_AVATARS = [
@@ -26,7 +31,8 @@ export default function EditResidentModal({
   onClose,
   resident,
   onSave,
-  towerNames = ['Torre 1', 'Torre 2', 'Torre 3']
+  towerNames = ['Torre 1', 'Torre 2', 'Torre 3'],
+  currentUser
 }: EditResidentModalProps) {
   const [name, setName] = useState('');
   const [towerInput, setTowerInput] = useState(towerNames[0] || 'Torre 1');
@@ -118,6 +124,11 @@ export default function EditResidentModal({
       return;
     }
 
+    if (resident?.role === 'MASTER' && currentUser?.role !== 'MASTER') {
+      alert('Operação negada: Você não possui a credencial necessária para modificar os dados ou permissões de um usuário MASTER.');
+      return;
+    }
+
     const fullUnit = `${towerInput} - Apt ${aptInput}`;
     const members = coResidentsStr
       .split(',')
@@ -134,6 +145,9 @@ export default function EditResidentModal({
       });
     }
 
+    const rawPassword = password.trim() || Math.floor(1000 + Math.random() * 9000).toString();
+    const hashedPassword = isBcryptHash(rawPassword) ? rawPassword : bcrypt.hashSync(rawPassword, 10);
+
     const updated: Resident = {
       ...resident,
       name: name.trim(),
@@ -144,7 +158,7 @@ export default function EditResidentModal({
       vehicles: finalVehicles,
       members,
       avatarUrl: avatarUrl || undefined,
-      password: password.trim() || Math.floor(1000 + Math.random() * 9000).toString(),
+      password: hashedPassword,
       role: role
     };
 
@@ -363,12 +377,17 @@ export default function EditResidentModal({
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as 'MASTER' | 'Morador' | 'Administrador' | 'Porteiro')}
-                  className="w-full bg-white border border-gray-250 rounded-xl px-3 py-2 text-sm focus:outline-none font-bold"
+                  disabled={resident?.role === 'MASTER' && currentUser?.role !== 'MASTER'}
+                  className={`w-full bg-white border border-gray-250 rounded-xl px-3 py-2 text-sm focus:outline-none font-bold ${resident?.role === 'MASTER' && currentUser?.role !== 'MASTER' ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <option value="Morador" className="font-normal text-slate-800">Morador (Consultas da unidade, agendamentos e devoluções)</option>
                   <option value="Porteiro" className="font-normal text-slate-800">Porteiro / Porteira (Controle de visitas, encomendas, sem configurações)</option>
-                  <option value="Administrador" className="font-normal text-slate-800">Administrador / Síndico (Controle total do sistema)</option>
-                  <option value="MASTER" className="font-black text-rose-600 bg-rose-50">👑 MASTER (Permissão Total de Tudo / Acesso Absoluto)</option>
+                  {(currentUser?.role === 'Administrador' || currentUser?.role === 'MASTER') && (
+                    <option value="Administrador" className="font-normal text-slate-800">Administrador / Síndico (Controle total do sistema)</option>
+                  )}
+                  {currentUser?.role === 'MASTER' && (
+                    <option value="MASTER" className="font-black text-rose-600 bg-rose-50">👑 MASTER (Permissão Total de Tudo / Acesso Absoluto)</option>
+                  )}
                 </select>
               </div>
             </div>
